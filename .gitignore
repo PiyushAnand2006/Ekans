@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+pnpm-lock.yaml
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Environment & Secrets
+.env
+.env.local
+
+# Logs
+*.log
+logs/
