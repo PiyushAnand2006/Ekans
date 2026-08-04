@@ -53,9 +53,30 @@ function genRelId(): string {
   return `rel-${Date.now()}-${_idCounter}`;
 }
 
+function sampleAgent(id: string, name: string, role: string, description: string, agent_type: AgentDefinition['agent_type'], reports_to: string | null, manages: string[], color: string): AgentDefinition {
+  return {
+    id, name, role, description, goal: '', responsibilities: [], instructions: '', agent_type,
+    reports_to, manages, model_config: { provider: 'openai', model: 'gpt-4o-mini', temperature: 0.7, max_tokens: 4096 },
+    tools: [], permissions: [], knowledge_sources: [], budget: { max_cost: 1, currency: 'USD' }, color, metadata: {},
+  };
+}
+
+const sampleAgents = new Map<string, AgentDefinition>([
+  ['founder', sampleAgent('founder', 'Ekans Workforce', 'Organization owner', 'Define the objective and supervise the AI organization.', 'HUMAN', null, ['sales', 'marketing', 'delivery', 'automation', 'soc'], '#d29922')],
+  ['sales', sampleAgent('sales', 'Sales & Business Development', 'Revenue team', 'Owns the revenue engine, lead pipeline, and customer growth.', 'MANAGER', 'founder', [], '#4a9eff')],
+  ['marketing', sampleAgent('marketing', 'Marketing & Content Engine', 'Marketing team', 'Creates demand through content, campaigns, and market insight.', 'MANAGER', 'founder', [], '#4a9eff')],
+  ['delivery', sampleAgent('delivery', 'Project Delivery & Client Success', 'Delivery team', 'Retains and expands client relationships through successful delivery.', 'MANAGER', 'founder', [], '#4a9eff')],
+  ['automation', sampleAgent('automation', 'Internal AI & Automation', 'Operations team', 'Improves internal operations through automation and AI systems.', 'MANAGER', 'founder', [], '#4a9eff')],
+  ['soc', sampleAgent('soc', 'Security Operations Center', 'Security team', 'Monitors and responds to security events across the organization.', 'MANAGER', 'founder', [], '#4a9eff')],
+]);
+
+const sampleRelationships = new Map<string, OrganizationRelationship>([
+  ...['sales', 'marketing', 'delivery', 'automation', 'soc'].map((target_id): [string, OrganizationRelationship] => [`rel-founder-${target_id}`, { id: `rel-founder-${target_id}`, source_id: 'founder', target_id, type: 'MANAGES' }]),
+]);
+
 export const useOrgStore = create<OrgStore>((set, get) => ({
-  agents: new Map(),
-  relationships: new Map(),
+  agents: sampleAgents,
+  relationships: sampleRelationships,
   positions: new Map(),
   agentStatuses: new Map(),
   orgName: 'My AI Organization',

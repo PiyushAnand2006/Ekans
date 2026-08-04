@@ -10,6 +10,7 @@ import {
   type Connection,
   type NodeChange,
   type NodeMouseHandler,
+  type OnNodeDrag,
   BackgroundVariant,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -124,8 +125,8 @@ export function OrgCanvas() {
   }, [selectAgent]);
 
   // Handle drag stop → save position
-  const onNodeDragStop = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
+  const onNodeDragStop: OnNodeDrag<Node> = useCallback(
+    (_event, node) => {
       setPosition(node.id, { x: node.position.x, y: node.position.y });
     },
     [setPosition],
@@ -172,15 +173,23 @@ export function OrgCanvas() {
         minZoom={0.15}
         maxZoom={2}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="rgba(255,255,255,0.04)" />
-        <Controls showInteractive={false} />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#21262d" />
+        <Controls position="bottom-left" showInteractive={false} className="aui-controls" />
         <MiniMap
           nodeColor={(n) => {
             const agent = (n.data as any)?.agent;
             return agent?.color || '#4a9eff';
           }}
           maskColor="rgba(0,0,0,0.7)"
-          style={{ borderRadius: 10 }}
+          className="aui-minimap"
+          nodeStrokeWidth={0}
+          nodeBorderRadius={4}
+          style={{
+            background: 'linear-gradient(135deg, rgba(21, 27, 35, 0.95) 0%, rgba(13, 17, 23, 0.95) 100%)',
+            borderRadius: 12,
+            border: '1px solid var(--border-color)',
+            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4)',
+          }}
         />
       </ReactFlow>
     </div>

@@ -77,6 +77,26 @@ function AgentNodeInner({ data, selected }: NodeProps) {
   };
 
   const statusColor = status ? `var(--status-${status.toLowerCase()})` : undefined;
+  const badge = agent.agent_type === 'MANAGER' ? 'TEAM' : agent.agent_type === 'HUMAN' ? 'HUMAN' : 'AGENT';
+
+  return (
+    <div
+      className={`agent-node agent-node-atm ${agent.agent_type.toLowerCase()}${selected ? ' selected' : ''}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onContextMenu={handleContextMenu}
+      onDoubleClick={handleDoubleClick}
+    >
+      <Handle type="target" position={Position.Top} style={hovered ? handleHoverStyle : handleBaseStyle} />
+      <span className="agent-node-type-badge" style={{ background: color }}>{badge}</span>
+      <div className="agent-node-name">{agent.name}</div>
+      <div className="agent-node-description">{agent.description || agent.role || '\u00a0'}</div>
+      {childCount > 0 && <div className="agent-node-children" style={{ color }}>{childCount} {childCount === 1 ? 'agent' : 'agents'}</div>}
+      {status && status !== 'IDLE' && <div className="agent-node-status" style={{ color: statusColor }}><span className={`agent-node-status-dot${status === 'WORKING' || status === 'PLANNING' ? ' working' : ''}`} style={{ background: statusColor }} />{STATUS_LABELS[status!]}</div>}
+      {hovered && <><button className="agent-node-remove" onClick={handleRemove} onMouseDown={(event) => event.stopPropagation()} title="Delete agent">x</button><button className="agent-node-add" onClick={handleAddChild} onMouseDown={(event) => event.stopPropagation()} title="Add subordinate">+</button></>}
+      <Handle type="source" position={Position.Bottom} style={hovered ? handleHoverStyle : handleBaseStyle} />
+    </div>
+  );
 
   return (
     <div
@@ -140,7 +160,7 @@ function AgentNodeInner({ data, selected }: NodeProps) {
             className={`agent-node-status-dot${status === 'WORKING' || status === 'PLANNING' ? ' working' : ''}`}
             style={{ background: statusColor }}
           />
-          {STATUS_LABELS[status]}
+          {STATUS_LABELS[status!]}
         </div>
       )}
 
