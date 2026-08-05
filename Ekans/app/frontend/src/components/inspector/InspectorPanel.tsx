@@ -10,13 +10,14 @@ const TYPE_COLORS: Record<AgentType, string> = {
   CUSTOM: '#8b5cf6',
 };
 
-const PROVIDERS = ['openai', 'anthropic', 'google', 'ollama', 'openai-compatible'];
+const PROVIDERS = ['openai', 'anthropic', 'google', 'openrouter', 'ollama', 'openai-compatible'];
 const AGENT_TYPES: AgentType[] = ['MANAGER', 'SPECIALIST', 'REVIEWER', 'HUMAN', 'CUSTOM'];
 const AVAILABLE_TOOLS = ['web_search', 'http', 'filesystem', 'terminal', 'git', 'documents'];
 const DEFAULT_MODELS: Record<string, string> = {
   openai: 'gpt-4o-mini',
   anthropic: 'claude-sonnet-4-20250514',
   google: 'gemini-2.5-flash',
+  openrouter: 'openai/gpt-4o-mini',
   ollama: 'llama3.3',
   'openai-compatible': 'gpt-4o-mini',
 };

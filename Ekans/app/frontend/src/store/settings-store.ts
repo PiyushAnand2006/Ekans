@@ -17,6 +17,7 @@ export interface SettingsState {
     openai: ProviderConfig;
     anthropic: ProviderConfig;
     google: ProviderConfig;
+    openrouter: ProviderConfig;
     ollama: { url: string; configured: boolean };
     'openai-compatible': { key: string; url: string; configured: boolean };
   };
@@ -33,7 +34,7 @@ export interface SettingsState {
 }
 
 interface SettingsActions {
-  setProviderKey: (provider: 'openai' | 'anthropic' | 'google' | 'openai-compatible', key: string) => void;
+  setProviderKey: (provider: 'openai' | 'anthropic' | 'google' | 'openrouter' | 'openai-compatible', key: string) => void;
   setOllamaUrl: (url: string) => void;
   setOpenAICompatible: (key: string, url: string) => void;
   setDefaults: (provider: string, model: string, temperature: number, maxTokens: number) => void;
@@ -81,6 +82,7 @@ const defaultState: SettingsState = {
     openai: { key: '', configured: false },
     anthropic: { key: '', configured: false },
     google: { key: '', configured: false },
+    openrouter: { key: '', configured: false },
     ollama: { url: 'http://localhost:11434', configured: false },
     'openai-compatible': { key: '', url: '', configured: false },
   },
@@ -118,6 +120,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => {
             key,
             configured: key.length > 0 && providers['openai-compatible'].url.length > 0,
           };
+        } else if (provider === 'openrouter') {
+          providers.openrouter = { key, configured: key.length > 0 };
         } else {
           providers[provider] = { key, configured: key.length > 0 };
         }
@@ -185,6 +189,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => {
           providers.ollama = { url: 'http://localhost:11434', configured: false };
         } else if (provider === 'openai-compatible') {
           providers['openai-compatible'] = { key: '', url: '', configured: false };
+        } else if (provider === 'openrouter') {
+          providers.openrouter = { key: '', configured: false };
         } else {
           const p = provider as 'openai' | 'anthropic' | 'google';
           providers[p] = { key: '', configured: false };
@@ -201,6 +207,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => {
       if (providers.openai.configured) active.push('openai');
       if (providers.anthropic.configured) active.push('anthropic');
       if (providers.google.configured) active.push('google');
+      if (providers.openrouter.configured) active.push('openrouter');
       if (providers.ollama.configured) active.push('ollama');
       if (providers['openai-compatible'].configured) active.push('openai-compatible');
       return active;
@@ -212,6 +219,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => {
         providers.openai.configured ||
         providers.anthropic.configured ||
         providers.google.configured ||
+        providers.openrouter.configured ||
         providers.ollama.configured ||
         providers['openai-compatible'].configured
       );

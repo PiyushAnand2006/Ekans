@@ -2,29 +2,87 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 import httpx
 
 from backend.providers.base import Completion, ModelProvider, ProviderError
 
 
+_REQUEST_LOCKS: dict[tuple[str, str, str], asyncio.Lock] = {}
+
+
+def _lock_for(provider: str, api_key: str, base_url: str = "") -> asyncio.Lock:
+    normalized_provider = provider.lower().replace("_", "-")
+    lock_key = (normalized_provider, api_key, base_url.rstrip("/"))
+    lock = _REQUEST_LOCKS.get(lock_key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _REQUEST_LOCKS[lock_key] = lock
+    return lock
+
+
+async def _request_with_retry(make_request, provider_label: str) -> httpx.Response:
+    delay = 1.0
+    response: httpx.Response | None = None
+    for attempt in range(3):
+        response = await make_request()
+        if response.status_code not in {429, 500, 502, 503, 504}:
+            return response
+        if attempt == 2:
+            break
+        retry_after = response.headers.get("Retry-After")
+        try:
+            wait_seconds = float(retry_after) if retry_after else delay
+        except ValueError:
+            wait_seconds = delay
+        await asyncio.sleep(wait_seconds)
+        delay = min(delay * 2, 8.0)
+    assert response is not None
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise ProviderError(f"{provider_label}: rate limited or rejected the request ({response.status_code})") from exc
+    return response
+
+
 class OpenAICompatibleProvider(ModelProvider):
-    def __init__(self, api_key: str, base_url: str = "https://api.openai.com/v1") -> None:
-        self.api_key, self.base_url = api_key, base_url.rstrip("/")
+    def __init__(self, api_key: str, base_url: str = "https://api.openai.com/v1", extra_headers: dict[str, str] | None = None) -> None:
+        self.api_key, self.base_url, self.extra_headers = api_key, base_url.rstrip("/"), extra_headers or {}
 
     async def complete(self, *, model: str, system: str, prompt: str, temperature: float, max_tokens: int) -> Completion:
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", **self.extra_headers}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         try:
             async with httpx.AsyncClient(timeout=90) as client:
-                response = await client.post(f"{self.base_url}/chat/completions", headers=headers, json={"model": model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "temperature": temperature, "max_tokens": max_tokens})
+                async with _lock_for("openai-compatible", self.api_key, self.base_url):
+                    response = await _request_with_retry(
+                        lambda: client.post(
+                            f"{self.base_url}/chat/completions",
+                            headers=headers,
+                            json={"model": model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "temperature": temperature, "max_tokens": max_tokens},
+                        ),
+                        "OpenAI-compatible provider",
+                    )
                 response.raise_for_status()
                 data = response.json()
             usage = data.get("usage", {})
             return Completion(data["choices"][0]["message"]["content"], usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
         except (httpx.HTTPError, KeyError, IndexError, TypeError) as exc:
             raise ProviderError(f"OpenAI-compatible provider: {exc}") from exc
+
+
+class OpenRouterProvider(OpenAICompatibleProvider):
+    def __init__(self, api_key: str) -> None:
+        super().__init__(
+            api_key,
+            "https://openrouter.ai/api/v1",
+            extra_headers={
+                "HTTP-Referer": "http://localhost",
+                "X-Title": "Ekans AI Workforce Builder",
+            },
+        )
 
 
 class AnthropicProvider(ModelProvider):
@@ -34,7 +92,15 @@ class AnthropicProvider(ModelProvider):
     async def complete(self, *, model: str, system: str, prompt: str, temperature: float, max_tokens: int) -> Completion:
         try:
             async with httpx.AsyncClient(timeout=90) as client:
-                response = await client.post("https://api.anthropic.com/v1/messages", headers={"x-api-key": self.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}, json={"model": model, "system": system, "messages": [{"role": "user", "content": prompt}], "temperature": temperature, "max_tokens": max_tokens})
+                async with _lock_for("anthropic", self.api_key):
+                    response = await _request_with_retry(
+                        lambda: client.post(
+                            "https://api.anthropic.com/v1/messages",
+                            headers={"x-api-key": self.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                            json={"model": model, "system": system, "messages": [{"role": "user", "content": prompt}], "temperature": temperature, "max_tokens": max_tokens},
+                        ),
+                        "Anthropic provider",
+                    )
                 response.raise_for_status()
                 data = response.json()
             usage = data.get("usage", {})
@@ -51,7 +117,14 @@ class GeminiProvider(ModelProvider):
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
         try:
             async with httpx.AsyncClient(timeout=90) as client:
-                response = await client.post(url, json={"systemInstruction": {"parts": [{"text": system}]}, "contents": [{"role": "user", "parts": [{"text": prompt}]}], "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens}})
+                async with _lock_for("google", self.api_key, "https://generativelanguage.googleapis.com"):
+                    response = await _request_with_retry(
+                        lambda: client.post(
+                            url,
+                            json={"systemInstruction": {"parts": [{"text": system}]}, "contents": [{"role": "user", "parts": [{"text": prompt}]}], "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens}},
+                        ),
+                        "Google provider",
+                    )
                 response.raise_for_status()
                 data = response.json()
             usage = data.get("usageMetadata", {})
@@ -65,6 +138,7 @@ def provider_for(name: str, keys: dict[str, Any], api_key: str = "") -> ModelPro
     if normalized == "openai": return OpenAICompatibleProvider(api_key or str(keys.get("openai", "")))
     if normalized == "anthropic": return AnthropicProvider(api_key or str(keys.get("anthropic", "")))
     if normalized in {"google", "gemini"}: return GeminiProvider(api_key or str(keys.get("google", "")))
+    if normalized == "openrouter": return OpenRouterProvider(api_key or str(keys.get("openrouter", "")))
     if normalized == "ollama":
         base_url = str(keys.get("ollama_url") or "http://localhost:11434").rstrip("/")
         return OpenAICompatibleProvider("", base_url if base_url.endswith("/v1") else f"{base_url}/v1")

@@ -22,6 +22,7 @@ DEFAULT_MODELS = {
     "anthropic": "claude-sonnet-4-20250514",
     "google": "gemini-2.5-flash",
     "gemini": "gemini-2.5-flash",
+    "openrouter": "openai/gpt-4o-mini",
     "ollama": "llama3.3",
     "openai-compatible": "gpt-4o-mini",
 }

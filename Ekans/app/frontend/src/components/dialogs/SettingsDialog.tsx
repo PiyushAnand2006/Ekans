@@ -23,12 +23,19 @@ const PROVIDER_INFO: Record<string, { label: string; placeholder: string; icon: 
     icon: '🔵',
     helpUrl: 'https://aistudio.google.com/apikey',
   },
+  openrouter: {
+    label: 'OpenRouter',
+    placeholder: 'sk-or-v1-...',
+    icon: '🟠',
+    helpUrl: 'https://openrouter.ai/keys',
+  },
 };
 
 const MODEL_SUGGESTIONS: Record<string, string[]> = {
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3-mini'],
   anthropic: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-3-20250414'],
   google: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
+  openrouter: ['openai/gpt-4o-mini', 'google/gemini-2.5-flash', 'anthropic/claude-sonnet-4-20250514', 'meta-llama/llama-3.1-8b-instruct'],
   ollama: ['llama3.3', 'mistral', 'deepseek-r1', 'qwen3', 'gemma3'],
   'openai-compatible': [],
 };
@@ -139,7 +146,7 @@ function ApiKeysTab() {
                   className="input settings-key-input"
                   type={visibleKeys[key] ? 'text' : 'password'}
                   value={provider.key}
-                  onChange={(e) => setProviderKey(key as 'openai' | 'anthropic' | 'google', e.target.value)}
+                  onChange={(e) => setProviderKey(key as 'openai' | 'anthropic' | 'google' | 'openrouter', e.target.value)}
                   placeholder={info.placeholder}
                   spellCheck={false}
                   autoComplete="off"
@@ -244,6 +251,56 @@ function ApiKeysTab() {
           </div>
         </div>
       </div>
+
+      {/* OpenRouter */}
+      <div className="settings-key-group">
+        <div className="settings-key-header">
+          <div className="settings-key-label">
+            <span>🟠</span>
+            <span>OpenRouter</span>
+            <span className={`settings-status-dot ${providers.openrouter.configured ? 'configured' : 'not-configured'}`} />
+            <span className="settings-status-text">
+              {providers.openrouter.configured ? 'Configured' : 'Not configured'}
+            </span>
+          </div>
+          <a
+            className="settings-help-link"
+            href="https://openrouter.ai/keys"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Get key ↗
+          </a>
+        </div>
+        <div className="settings-key-input-row">
+          <div className="settings-key-input-wrapper">
+            <input
+              className="input settings-key-input"
+              type={visibleKeys.openrouter ? 'text' : 'password'}
+              value={providers.openrouter.key}
+              onChange={(e) => setProviderKey('openrouter', e.target.value)}
+              placeholder="sk-or-v1-..."
+              spellCheck={false}
+              autoComplete="off"
+            />
+            <button
+              className="btn btn-ghost btn-icon settings-eye-btn"
+              onClick={() => toggleVisible('openrouter')}
+              title={visibleKeys.openrouter ? 'Hide key' : 'Show key'}
+            >
+              {visibleKeys.openrouter ? '🙈' : '👁️'}
+            </button>
+          </div>
+          {providers.openrouter.configured && (
+            <button
+              className="btn btn-ghost btn-sm settings-clear-btn"
+              onClick={() => clearProviderKey('openrouter')}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -254,7 +311,7 @@ function DefaultsTab() {
   const settings = useSettingsStore();
   const activeProviders = settings.getActiveProviders();
 
-  const providerOptions = ['openai', 'anthropic', 'google', 'ollama', 'openai-compatible'];
+  const providerOptions = ['openai', 'anthropic', 'google', 'openrouter', 'ollama', 'openai-compatible'];
   const suggestions = MODEL_SUGGESTIONS[settings.defaultProvider] || [];
 
   return (
@@ -387,7 +444,7 @@ function AboutTab() {
           </div>
           <div className="settings-about-credit-item">
             <span>🤖</span>
-            <span>Multi-provider LLM support (OpenAI, Anthropic, Google, Ollama)</span>
+            <span>Multi-provider LLM support (OpenAI, Anthropic, Google, OpenRouter, Ollama)</span>
           </div>
         </div>
       </div>

@@ -8,7 +8,7 @@ import type { OrganizationDefinition, RuntimeEvent } from '@/types/domain';
 function providerKeys() {
   const providers = useSettingsStore.getState().providers;
   return { openai: providers.openai.key, anthropic: providers.anthropic.key, google: providers.google.key,
-    ollama_url: providers.ollama.url, openai_compatible_key: providers['openai-compatible'].key,
+    openrouter: providers.openrouter.key, ollama_url: providers.ollama.url, openai_compatible_key: providers['openai-compatible'].key,
     openai_compatible_url: providers['openai-compatible'].url };
 }
 
