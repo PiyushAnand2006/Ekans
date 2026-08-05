@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { OrgCanvas } from '@/components/canvas/OrgCanvas';
 import { InspectorPanel } from '@/components/inspector/InspectorPanel';
 import { Toolbar } from '@/components/common/Toolbar';
@@ -6,11 +7,18 @@ import { ContextMenu } from '@/components/common/ContextMenu';
 import { ToastContainer } from '@/components/common/Toast';
 import { CreateAgentDialog } from '@/components/dialogs/CreateAgentDialog';
 import { DeleteConfirmDialog } from '@/components/dialogs/DeleteConfirmDialog';
+import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { useUiStore } from '@/store/ui-store';
+import { initVaultAutoSave } from '@/memory/vault-store';
 import './App.css';
 
 function App() {
   const inspectorOpen = useUiStore((s) => s.inspectorOpen);
+
+  // Initialize vault auto-save on mount
+  useEffect(() => {
+    initVaultAutoSave();
+  }, []);
 
   return (
     <div className="app">
@@ -27,6 +35,7 @@ function App() {
       <ContextMenu />
       <CreateAgentDialog />
       <DeleteConfirmDialog />
+      <SettingsDialog />
       <ToastContainer />
     </div>
   );
