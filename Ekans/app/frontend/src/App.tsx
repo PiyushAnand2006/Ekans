@@ -25,10 +25,10 @@ function App() {
     <div className="app">
       <Toolbar />
       <div className="main-content">
+        <RunDashboard />
         <div className="canvas-panel">
           <SearchBar />
           <OrgCanvas />
-          <RunDashboard />
         </div>
         {inspectorOpen && <InspectorPanel />}
       </div>

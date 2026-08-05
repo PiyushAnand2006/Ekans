@@ -174,7 +174,7 @@ export function OrgCanvas() {
         maxZoom={2}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#21262d" />
-        <Controls position="bottom-left" showInteractive={false} className="aui-controls" />
+        <Controls position="top-left" showInteractive={false} className="aui-controls" />
         <MiniMap
           nodeColor={(n) => {
             const agent = (n.data as any)?.agent;
