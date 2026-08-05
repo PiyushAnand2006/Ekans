@@ -57,7 +57,7 @@ function sampleAgent(id: string, name: string, role: string, description: string
   return {
     id, name, role, description, goal: '', responsibilities: [], instructions: '', agent_type,
     reports_to, manages, model_config: { provider: 'openai', model: 'gpt-4o-mini', temperature: 0.7, max_tokens: 4096 },
-    tools: [], permissions: [], knowledge_sources: [], budget: { max_cost: 1, currency: 'USD' }, color, metadata: {},
+    tools: [], permissions: [], knowledge_sources: [], budget: { max_cost: 1, currency: 'USD' }, color, api_key: '', metadata: {},
   };
 }
 

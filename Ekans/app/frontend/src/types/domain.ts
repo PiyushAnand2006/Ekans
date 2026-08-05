@@ -51,6 +51,7 @@ export interface AgentDefinition {
   knowledge_sources: string[];
   budget: BudgetConfig;
   color: string;               // UI display color
+  api_key: string;
   metadata: Record<string, unknown>;
 }
 
@@ -70,6 +71,7 @@ export interface OrganizationDefinition {
   objective: string;
   agents: AgentDefinition[];
   relationships: OrganizationRelationship[];
+  positions: Record<string, { x: number; y: number }>;
   tools: string[];
   budget: BudgetConfig;
   metadata: Record<string, unknown>;
@@ -315,6 +317,7 @@ export function createAgentFromTemplate(
     knowledge_sources: [],
     budget: { ...DEFAULT_BUDGET },
     color: template.color,
+    api_key: '',
     metadata: {},
   };
 }

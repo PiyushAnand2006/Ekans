@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes import router
 from backend.config import settings
+from backend.events.event_bus import event_bus
 from backend.storage.database import close_db, init_db
 
 
@@ -36,6 +37,21 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix="/api")
+
+
+@app.websocket("/api/runs/{run_id}/stream")
+async def run_event_stream(websocket: WebSocket, run_id: str):
+    """Live run updates. Historical events remain available through REST."""
+    await websocket.accept()
+    queue = event_bus.subscribe(run_id)
+    try:
+        while True:
+            event = await queue.get()
+            await websocket.send_json(event.model_dump(mode="json"))
+    except WebSocketDisconnect:
+        pass
+    finally:
+        event_bus.unsubscribe(run_id, queue)
 
 
 @app.get("/")

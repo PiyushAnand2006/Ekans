@@ -138,6 +138,7 @@ class AgentDefinition(BaseModel):
     knowledge_sources: list[str] = Field(default_factory=list)
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     color: str = "#4a9eff"
+    api_key: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"populate_by_name": True}
@@ -244,8 +245,11 @@ class UpdateOrganizationRequest(BaseModel):
 
 
 class CreateRunRequest(BaseModel):
-    objective: str
+    objective: str = Field(min_length=3, max_length=20_000)
     provider_keys: dict[str, str] = Field(default_factory=dict)
+    # The visual editor can run an unsaved organization. This snapshot is only
+    # persisted as an organization record, never alongside the secret keys.
+    organization: OrganizationDefinition | None = None
 
 
 class ProviderKeysRequest(BaseModel):

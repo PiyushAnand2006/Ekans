@@ -8,6 +8,7 @@ import { ToastContainer } from '@/components/common/Toast';
 import { CreateAgentDialog } from '@/components/dialogs/CreateAgentDialog';
 import { DeleteConfirmDialog } from '@/components/dialogs/DeleteConfirmDialog';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
+import { RunDashboard } from '@/components/runtime/RunDashboard';
 import { useUiStore } from '@/store/ui-store';
 import { initVaultAutoSave } from '@/memory/vault-store';
 import './App.css';
@@ -27,6 +28,7 @@ function App() {
         <div className="canvas-panel">
           <SearchBar />
           <OrgCanvas />
+          <RunDashboard />
         </div>
         {inspectorOpen && <InspectorPanel />}
       </div>

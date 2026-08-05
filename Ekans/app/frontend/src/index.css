@@ -1369,3 +1369,15 @@ body {
   align-items: center;
   gap: 3px;
 }
+/* Workforce execution panel */
+.run-dashboard { position: absolute; left: 18px; right: 18px; bottom: 18px; z-index: 5; max-width: 780px; padding: 14px; border: 1px solid var(--border-color); border-radius: 12px; background: rgba(18, 24, 38, .95); box-shadow: 0 12px 32px rgba(0,0,0,.25); backdrop-filter: blur(12px); }
+.run-dashboard-header, .run-controls { display: flex; gap: 10px; align-items: center; }
+.run-dashboard-header { justify-content: space-between; margin-bottom: 10px; color: var(--text-primary); }
+.run-dashboard-header span, .run-summary { font-size: 12px; color: var(--text-secondary); }
+.run-controls textarea { flex: 1; resize: vertical; min-height: 36px; padding: 8px 10px; color: var(--text-primary); background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 7px; font: inherit; }
+.run-team-button, .run-cancel-button { padding: 9px 13px; border: 0; border-radius: 7px; cursor: pointer; font-weight: 650; }
+.run-team-button { color: #fff; background: var(--accent-blue); }.run-team-button:disabled { opacity: .6; cursor: wait; }
+.run-cancel-button { color: #fca5a5; background: rgba(239,68,68,.16); border: 1px solid rgba(239,68,68,.4); }
+.run-error { margin-top: 8px; font-size: 12px; color: #fca5a5; }.run-summary { margin-top: 8px; }
+.run-result { max-height: 180px; margin-top: 10px; padding: 10px; overflow: auto; border-radius: 8px; background: rgba(0,0,0,.18); color: var(--text-primary); font-size: 13px; }
+.run-result pre { margin: 6px 0 0; white-space: pre-wrap; font: inherit; }.run-events { margin-top: 8px; font-size: 12px; color: var(--text-secondary); }.run-events div { display: flex; gap: 8px; padding: 2px 0; }.run-events span { min-width: 118px; color: var(--accent-blue); font-size: 10px; }
