@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cancelRun, fetchRun, fetchRunEvents, startRun } from '@/services/api-client';
+import { extractCodeBlocks, isFileSystemAccessSupported, saveCodeBlocks, getSelectedDirectoryName, pickDirectory, clearDirectoryHandle, collectRunCodeFiles } from '@/services/file-system-service';
+import { downloadZip } from '@/services/zip-service';
 import { MarkdownRenderer } from '@/components/common/MarkdownRenderer';
 import { useOrgStore } from '@/store/org-store';
 import { useRuntimeStore } from '@/store/runtime-store';
@@ -88,6 +90,238 @@ function statusColor(status: string): string {
     case 'PENDING': case 'ASSIGNED': return '#a78bfa';
     default: return 'var(--text-secondary)';
   }
+}
+
+// ── SVG Icons (small) ────────────────────────────────────────────
+
+function SaveIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+      <polyline points="17 21 17 13 7 13 7 21" />
+      <polyline points="7 3 7 8 15 8" />
+    </svg>
+  );
+}
+
+function FolderIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
+function ZipIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+      <line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
+  );
+}
+
+// ── Save Code Button ─────────────────────────────────────────────
+
+function SaveCodeButton({ content }: { content: string }) {
+  const [status, setStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
+  const [message, setMessage] = useState('');
+  const [dirName, setDirName] = useState(getSelectedDirectoryName());
+
+  if (!isFileSystemAccessSupported()) return null;
+
+  const codeBlocks = extractCodeBlocks(content).filter((b) => b.isCode);
+  if (codeBlocks.length === 0) return null;
+
+  const handleSave = async () => {
+    setStatus('saving');
+    try {
+      const result = await saveCodeBlocks(codeBlocks);
+      setDirName(getSelectedDirectoryName());
+      if (result.success) {
+        setStatus('done');
+        setMessage(`Saved ${result.filesWritten.length} file${result.filesWritten.length === 1 ? '' : 's'}: ${result.filesWritten.join(', ')}`);
+        setTimeout(() => setStatus('idle'), 4000);
+      } else {
+        setStatus('error');
+        setMessage(result.error || 'Save failed');
+        setTimeout(() => setStatus('idle'), 4000);
+      }
+    } catch {
+      setStatus('error');
+      setMessage('Save cancelled or failed');
+      setTimeout(() => setStatus('idle'), 3000);
+    }
+  };
+
+  const handleChangeDir = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      clearDirectoryHandle();
+      await pickDirectory();
+      setDirName(getSelectedDirectoryName());
+    } catch { /* user cancelled */ }
+  };
+
+  return (
+    <div className="save-code-bar">
+      <div className="save-code-bar-left">
+        <button
+          className={`save-code-btn${status === 'done' ? ' save-code-btn-done' : ''}${status === 'error' ? ' save-code-btn-error' : ''}`}
+          onClick={() => void handleSave()}
+          disabled={status === 'saving'}
+          title={`Save ${codeBlocks.length} code file${codeBlocks.length === 1 ? '' : 's'} to disk`}
+        >
+          {status === 'done' ? <CheckIcon /> : <SaveIcon />}
+          {status === 'saving' ? 'Saving…' : status === 'done' ? 'Saved!' : `Save ${codeBlocks.length} file${codeBlocks.length === 1 ? '' : 's'}`}
+        </button>
+        {dirName && (
+          <button className="save-code-dir-btn" onClick={(e) => void handleChangeDir(e)} title="Change save directory">
+            <FolderIcon />
+            {dirName}
+          </button>
+        )}
+      </div>
+      {message && status !== 'idle' && (
+        <span className={`save-code-msg${status === 'error' ? ' save-code-msg-error' : ''}`}>{message}</span>
+      )}
+    </div>
+  );
+}
+
+// ── Full Codebase Exporter Bar ────────────────────────────────────
+
+interface FullCodebaseExportBarProps {
+  tasks: TaskDefinition[];
+  agentsById: Map<string, AgentDefinition>;
+}
+
+function FullCodebaseExportBar({ tasks, agentsById }: FullCodebaseExportBarProps) {
+  const [status, setStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
+  const [message, setMessage] = useState('');
+  const [dirName, setDirName] = useState(getSelectedDirectoryName());
+
+  const codeFiles = collectRunCodeFiles(tasks, agentsById);
+  if (codeFiles.length === 0) return null;
+
+  const handleExportZip = () => {
+    try {
+      downloadZip(
+        codeFiles.map((f) => ({ filename: f.filename, content: f.content })),
+        'ekans-codebase.zip'
+      );
+      setStatus('done');
+      setMessage(`Downloaded zip with ${codeFiles.length} file${codeFiles.length === 1 ? '' : 's'}!`);
+      setTimeout(() => setStatus('idle'), 4000);
+    } catch {
+      setStatus('error');
+      setMessage('Failed to generate zip file');
+      setTimeout(() => setStatus('idle'), 4000);
+    }
+  };
+
+  const handleExportDirectory = async () => {
+    setStatus('saving');
+    try {
+      const result = await saveCodeBlocks(codeFiles);
+      setDirName(getSelectedDirectoryName());
+      if (result.success) {
+        setStatus('done');
+        setMessage(`Exported ${result.filesWritten.length} file${result.filesWritten.length === 1 ? '' : 's'} to local folder!`);
+        setTimeout(() => setStatus('idle'), 5000);
+      } else {
+        setStatus('error');
+        setMessage(result.error || 'Export failed');
+        setTimeout(() => setStatus('idle'), 4000);
+      }
+    } catch {
+      setStatus('error');
+      setMessage('Export cancelled or failed');
+      setTimeout(() => setStatus('idle'), 3000);
+    }
+  };
+
+  const handleChangeDir = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      clearDirectoryHandle();
+      await pickDirectory();
+      setDirName(getSelectedDirectoryName());
+    } catch { /* user cancelled */ }
+  };
+
+  return (
+    <div className="full-codebase-export-card">
+      <div className="full-codebase-export-header">
+        <div className="full-codebase-title">
+          <ZipIcon />
+          <span>Full Generated Codebase</span>
+          <span className="full-codebase-badge">{codeFiles.length} file{codeFiles.length === 1 ? '' : 's'}</span>
+        </div>
+        {dirName && (
+          <button className="save-code-dir-btn" onClick={(e) => void handleChangeDir(e)} title="Change target directory">
+            <FolderIcon />
+            {dirName}
+          </button>
+        )}
+      </div>
+
+      <div className="full-codebase-files-preview">
+        {codeFiles.slice(0, 4).map((f, i) => (
+          <span key={i} className="codebase-file-tag">{f.filename}</span>
+        ))}
+        {codeFiles.length > 4 && (
+          <span className="codebase-file-more">+{codeFiles.length - 4} more</span>
+        )}
+      </div>
+
+      <div className="full-codebase-actions">
+        <button
+          className="full-export-btn full-export-zip-btn"
+          onClick={handleExportZip}
+          title="Download complete codebase as a single .zip file (preserves folder structure)"
+        >
+          <DownloadIcon />
+          <span>Download .zip</span>
+        </button>
+
+        {isFileSystemAccessSupported() && (
+          <button
+            className={`full-export-btn full-export-dir-btn${status === 'done' ? ' done' : ''}`}
+            onClick={() => void handleExportDirectory()}
+            disabled={status === 'saving'}
+            title="Export all generated files directly into your local workspace folder"
+          >
+            {status === 'done' ? <CheckIcon /> : <FolderIcon />}
+            <span>{status === 'saving' ? 'Exporting…' : status === 'done' ? 'Exported!' : 'Sync to Local Folder'}</span>
+          </button>
+        )}
+      </div>
+
+      {message && status !== 'idle' && (
+        <div className={`full-export-msg${status === 'error' ? ' error' : ''}`}>{message}</div>
+      )}
+    </div>
+  );
 }
 
 // ── Agent Task Card ──────────────────────────────────────────────
@@ -208,6 +442,7 @@ function AgentTaskCard({ task, agent, agentsById, agentEvents }: AgentTaskCardPr
             <div className="agent-task-card-output">
               <MarkdownRenderer content={taskResult?.text || task.error || 'No response available.'} />
             </div>
+            {taskResult?.text && <SaveCodeButton content={taskResult.text} />}
           </div>
         </div>
       )}
@@ -363,8 +598,14 @@ export function RunDashboard() {
           <article className="run-result">
             <strong>Final response</strong>
             <MarkdownRenderer content={result.text} />
+            <SaveCodeButton content={result.text} />
           </article>
         )}
+
+        {/* Full Codebase Export Card */}
+        {activeRun?.tasks.length ? (
+          <FullCodebaseExportBar tasks={activeRun.tasks} agentsById={agentsById} />
+        ) : null}
 
         {/* Per-agent expandable cards */}
         {activeRun?.tasks.length ? (
