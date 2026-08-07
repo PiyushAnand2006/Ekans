@@ -17,6 +17,7 @@ from backend.providers.registry import provider_for
 from backend.runtime.context_router import ContextRouter, parse_structured_handoff
 from backend.runtime.dag import TaskDAG
 from backend.runtime.decomposer import DecomposedTask, TaskDecomposer
+from backend.runtime.project_verifier import ProjectVerifier, VerificationIssue, VerificationReport
 from backend.storage.database import EventRow, RunRow, TaskRow
 
 
@@ -32,6 +33,8 @@ DEFAULT_MODELS = {
 
 
 class WorkforceOrchestrator:
+    MAX_REPAIR_ATTEMPTS = 3
+
     def __init__(
         self,
         session_factory: async_sessionmaker,
@@ -49,6 +52,9 @@ class WorkforceOrchestrator:
         # Runtime mappings
         self.agents_by_id: dict[str, AgentDefinition] = {a.id: a for a in organization.agents}
         self.task_defs_by_id: dict[str, TaskDefinition] = {}
+        self.repair_outputs: list[tuple[str, str]] = []
+        self.repair_outputs_with_agent: list[tuple[str, str, str]] = []
+        self.repair_agents_by_source: dict[str, str] = {}
 
     async def emit(self, category: EventCategory, message: str, agent_id: str | None = None, task_id: str | None = None) -> None:
         event = RuntimeEvent(run_id=self.run_id, category=category, message=message, agent_id=agent_id, task_id=task_id)
@@ -158,6 +164,158 @@ class WorkforceOrchestrator:
 
         return agent.name, text, in_tokens, out_tokens
 
+    def _artifact_outputs(self) -> list[tuple[str, str, str]]:
+        """Return all raw task outputs plus later targeted repair responses as (task_id, agent_id, text)."""
+        outputs: list[tuple[str, str, str]] = []
+        for task in self.task_defs_by_id.values():
+            result = task.result if isinstance(task.result, dict) else {}
+            text = result.get("text") or ""
+            if text and not text.startswith("No provider response:"):
+                outputs.append((task.id, task.assigned_agent_id, text))
+        for source, agent_id, output in self.repair_outputs_with_agent:
+            outputs.append((source, agent_id, output))
+        return outputs
+
+    @staticmethod
+    def _format_verification_issues(report: VerificationReport) -> str:
+        if not report.issues:
+            return "No verification issues."
+        return "\n".join(
+            f"- [{issue.code}] {issue.path or 'project'}: {issue.message}"
+            for issue in report.issues
+        )
+
+    def _repair_agent_for_issue(self, report: VerificationReport, issue: VerificationIssue, lead_agent: AgentDefinition) -> AgentDefinition:
+        """Return a failed artifact to its producer specialist, NEVER to the manager by default."""
+        specialists = [agent for agent in self.organization.agents if agent.agent_type.value not in {"HUMAN", "MANAGER"}]
+        fallback = specialists[0] if specialists else lead_agent
+
+        # 1. Direct source agent match
+        if issue.source_agent_id and issue.source_agent_id in self.agents_by_id:
+            agent = self.agents_by_id[issue.source_agent_id]
+            if agent.agent_type.value not in {"HUMAN", "MANAGER"}:
+                return agent
+
+        # 2. Source task lookup
+        source_task_id = issue.source_task_id
+        if source_task_id in self.repair_agents_by_source:
+            agent = self.agents_by_id.get(self.repair_agents_by_source[source_task_id])
+            if agent and agent.agent_type.value not in {"HUMAN", "MANAGER"}:
+                return agent
+        if source_task_id in self.task_defs_by_id:
+            assigned_id = self.task_defs_by_id[source_task_id].assigned_agent_id
+            agent = self.agents_by_id.get(assigned_id)
+            if agent and agent.agent_type.value not in {"HUMAN", "MANAGER"}:
+                return agent
+
+        # 3. Path-based producer lookup
+        if issue.path:
+            candidates = [file for file in report.files if file.path == issue.path]
+            if not candidates and "/" in issue.path:
+                root = issue.path.split("/", 1)[0]
+                candidates = [file for file in report.files if file.path.startswith(f"{root}/")]
+            if candidates:
+                candidate_agent_id = candidates[0].source_agent_id
+                if candidate_agent_id in self.agents_by_id:
+                    agent = self.agents_by_id[candidate_agent_id]
+                    if agent.agent_type.value not in {"HUMAN", "MANAGER"}:
+                        return agent
+                producer_task = candidates[0].source_task_id
+                if producer_task in self.task_defs_by_id:
+                    agent = self.agents_by_id.get(self.task_defs_by_id[producer_task].assigned_agent_id)
+                    if agent and agent.agent_type.value not in {"HUMAN", "MANAGER"}:
+                        return agent
+
+        # 4. Keyword / responsibility matcher among specialists
+        def implementation_score(agent: AgentDefinition) -> int:
+            text = f"{agent.name} {agent.role} {' '.join(agent.responsibilities)}".lower()
+            score = sum(token in text for token in ("developer", "engineer", "backend", "frontend", "implement", "architect", "code"))
+            if issue.path:
+                if "front" in issue.path.lower() or "src/" in issue.path.lower() or issue.path.endswith((".tsx", ".jsx", ".html", ".css")):
+                    if "front" in text or "ui" in text:
+                        score += 5
+                if "back" in issue.path.lower() or issue.path.endswith(".py") or "server" in issue.path.lower():
+                    if "back" in text or "api" in text or "python" in text:
+                        score += 5
+            return score
+
+        if specialists:
+            return max(specialists, key=implementation_score)
+
+        return fallback
+
+    def _repair_groups(self, report: VerificationReport, lead_agent: AgentDefinition) -> dict[str, tuple[AgentDefinition, list[VerificationIssue]]]:
+        groups: dict[str, tuple[AgentDefinition, list[VerificationIssue]]] = {}
+        for issue in report.issues:
+            agent = self._repair_agent_for_issue(report, issue, lead_agent)
+            if agent.id not in groups:
+                groups[agent.id] = (agent, [])
+            groups[agent.id][1].append(issue)
+        return groups
+
+    def _source_output(self, source_task_id: str | None) -> str:
+        if source_task_id in self.task_defs_by_id:
+            result = self.task_defs_by_id[source_task_id].result
+            return (result.get("text") or "") if isinstance(result, dict) else ""
+        for source, output in self.repair_outputs:
+            if source == source_task_id:
+                return output
+        return ""
+
+    async def _verify_and_repair(self, lead_agent: AgentDefinition) -> VerificationReport:
+        """Bounded verification loop. A run can never export an unverified project."""
+        verifier = ProjectVerifier(self.objective)
+        for attempt in range(self.MAX_REPAIR_ATTEMPTS + 1):
+            await self.emit(
+                EventCategory.VERIFICATION_STARTED,
+                f"Verification pass {attempt + 1} is checking generated artifacts, manifests, entrypoints, and syntax.",
+                lead_agent.id,
+            )
+            report = verifier.verify(self._artifact_outputs())
+            if report.passed:
+                await self.emit(
+                    EventCategory.VERIFICATION_PASSED,
+                    f"Verification passed after {attempt} repair pass{'es' if attempt != 1 else ''}.",
+                    lead_agent.id,
+                )
+                return report
+
+            await self.emit(
+                EventCategory.VERIFICATION_FAILED,
+                f"Verification found {len(report.issues)} issue(s): {self._format_verification_issues(report)}",
+                lead_agent.id,
+            )
+            if attempt == self.MAX_REPAIR_ATTEMPTS:
+                return report
+
+            existing_files = "\n".join(f"- {file.path}" for file in report.files) or "- No valid artifacts extracted"
+            for repair_index, (repair_agent, issues) in enumerate(self._repair_groups(report, lead_agent).values(), start=1):
+                issue_text = self._format_verification_issues(VerificationReport(True, False, issues=issues))
+                original_output = self._source_output(issues[0].source_task_id)
+                repair_prompt = (
+                    f"### Original Objective\n{self.objective}\n\n"
+                    f"### Your Assigned Repair (pass {attempt + 1} of {self.MAX_REPAIR_ATTEMPTS})\n{issue_text}\n\n"
+                    f"### Current Artifact Manifest\n{existing_files}\n\n"
+                    f"### Your Previous Output (only if relevant)\n{original_output[:12000] or 'No previous exportable output was found.'}\n\n"
+                    "Fix only the artifacts assigned to you. Return complete replacement files, not explanations or patches.\n"
+                    "CRITICAL: Every code block MUST start with an explicit relative file path on the first line after the fence, e.g. ```tsx frontend/src/App.tsx"
+                )
+                await self.emit(
+                    EventCategory.REPAIR_REQUESTED,
+                    f"{repair_agent.name} is repairing {len(issues)} issue(s) it owns (pass {attempt + 1}).",
+                    repair_agent.id,
+                )
+                repair_text, _, _ = await self._complete(repair_agent, repair_prompt)
+                if repair_text.startswith("No provider response:"):
+                    report.issues.append(VerificationIssue("repair_provider_error", repair_text, source_task_id=issues[0].source_task_id))
+                    return report
+                source = f"repair_{attempt + 1}_{repair_index}"
+                self.repair_outputs.append((source, repair_text))
+                self.repair_outputs_with_agent.append((source, repair_agent.id, repair_text))
+                self.repair_agents_by_source[source] = repair_agent.id
+
+        raise RuntimeError("Verification loop exited unexpectedly")
+
     async def run(self) -> None:
         """Main execution engine: Decomposition -> Routing -> DAG -> Isolated Wave Execution -> Synthesis"""
         managers = [a for a in self.organization.agents if a.agent_type.value == "MANAGER"]
@@ -244,7 +402,17 @@ class WorkforceOrchestrator:
             # Execute wave tasks concurrently using asyncio.gather
             await asyncio.gather(*(self._execute_task(tid, task_dag, lead_agent.id) for tid in ready_tasks))
 
-        # ── Step 5: Final Synthesis ─────────────────────────────────────────
+        # ── Step 5: Artifact QA and targeted repair loop ────────────────────
+        verification = await self._verify_and_repair(lead_agent)
+        if not verification.passed:
+            await self.finish(RunStatus.FAILED, {
+                "text": "The manager withheld export because the generated project did not pass verification. Review the verification report and run the team again after correcting the failed checks.",
+                "verification": verification.to_dict(),
+                "files": [file.__dict__ for file in verification.files],
+            })
+            return
+
+        # ── Step 6: Manager final synthesis after successful quality gate ───
         completed_tasks = [t for t in self.task_defs_by_id.values() if t.status == TaskStatus.COMPLETED]
         usable_outputs: list[tuple[str, str]] = []
 
@@ -263,8 +431,9 @@ class WorkforceOrchestrator:
             final_prompt = (
                 f"### Objective Summary\n{self.objective}\n\n"
                 f"### Team Completed Deliverables\n{material}\n\n"
+                f"### Verification Status\nAll structural, manifest, dependency, and syntax checks passed. Exportable files: {', '.join(file.path for file in verification.files) or 'none (non-software objective)'}.\n\n"
                 "### Final Response Requirements\n"
-                "Synthesize the team's deliverables into a clear, cohesive final response. Highlight completed deliverables, key decisions, and next steps."
+                "Act as the accountable manager. Synthesize the team's deliverables into a clear, cohesive final response. State what was completed, the verification outcome, how to run the result when applicable, and any honest limitations. Do not claim tests or runtime behavior that was not verified."
             )
             final_text, _, _ = await self._complete(lead_agent, final_prompt)
         else:
@@ -272,7 +441,9 @@ class WorkforceOrchestrator:
 
         await self.finish(RunStatus.COMPLETED, {
             "text": final_text,
-            "contributors": [title for title, _ in usable_outputs]
+            "contributors": [title for title, _ in usable_outputs],
+            "verification": verification.to_dict(),
+            "files": [file.__dict__ for file in verification.files],
         })
 
     async def set_status(self, status: RunStatus) -> None:

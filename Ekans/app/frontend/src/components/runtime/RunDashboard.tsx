@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cancelRun, fetchRun, fetchRunEvents, startRun } from '@/services/api-client';
-import { extractCodeBlocks, isFileSystemAccessSupported, saveCodeBlocks, getSelectedDirectoryName, pickDirectory, clearDirectoryHandle, collectRunCodeFiles } from '@/services/file-system-service';
+import { extractCodeBlocks, isFileSystemAccessSupported, saveCodeBlocks, getSelectedDirectoryName, pickDirectory, clearDirectoryHandle } from '@/services/file-system-service';
+import type { CodeBlock } from '@/services/file-system-service';
 import { downloadZip } from '@/services/zip-service';
 import { MarkdownRenderer } from '@/components/common/MarkdownRenderer';
 import { useOrgStore } from '@/store/org-store';
@@ -13,6 +14,19 @@ function providerKeys() {
   return { openai: providers.openai.key, anthropic: providers.anthropic.key, google: providers.google.key,
     openrouter: providers.openrouter.key, ollama_url: providers.ollama.url, openai_compatible_key: providers['openai-compatible'].key,
     openai_compatible_url: providers['openai-compatible'].url };
+}
+
+type VerifiedRunResult = {
+  text?: string;
+  verification?: { is_software?: boolean; passed?: boolean; issues?: Array<{ message?: string }> };
+  files?: Array<{ path: string; content: string; language?: string }>;
+};
+
+function verifiedCodeFiles(result: VerifiedRunResult | null): CodeBlock[] {
+  if (!result?.verification?.passed || !Array.isArray(result.files)) return [];
+  return result.files
+    .filter((file) => typeof file.path === 'string' && typeof file.content === 'string')
+    .map((file) => ({ filename: file.path, content: file.content, language: file.language || '', isCode: true }));
 }
 
 function updateAgentStatus(event: RuntimeEvent) {
@@ -210,17 +224,13 @@ function SaveCodeButton({ content }: { content: string }) {
 
 // ── Full Codebase Exporter Bar ────────────────────────────────────
 
-interface FullCodebaseExportBarProps {
-  tasks: TaskDefinition[];
-  agentsById: Map<string, AgentDefinition>;
-}
+interface FullCodebaseExportBarProps { codeFiles: CodeBlock[]; }
 
-function FullCodebaseExportBar({ tasks, agentsById }: FullCodebaseExportBarProps) {
+function FullCodebaseExportBar({ codeFiles }: FullCodebaseExportBarProps) {
   const [status, setStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [dirName, setDirName] = useState(getSelectedDirectoryName());
 
-  const codeFiles = collectRunCodeFiles(tasks, agentsById);
   if (codeFiles.length === 0) return null;
 
   const handleExportZip = () => {
@@ -442,7 +452,6 @@ function AgentTaskCard({ task, agent, agentsById, agentEvents }: AgentTaskCardPr
             <div className="agent-task-card-output">
               <MarkdownRenderer content={taskResult?.text || task.error || 'No response available.'} />
             </div>
-            {taskResult?.text && <SaveCodeButton content={taskResult.text} />}
           </div>
         </div>
       )}
@@ -525,7 +534,8 @@ export function RunDashboard() {
   };
 
   const running = activeRun && ['PENDING', 'RUNNING'].includes(activeRun.status);
-  const result = activeRun?.result as { text?: string } | null;
+  const result = activeRun?.result as VerifiedRunResult | null;
+  const codeFiles = verifiedCodeFiles(result);
   const agentsById = new Map(agents);
 
   // Group events by agent_id for per-agent activity
@@ -598,13 +608,19 @@ export function RunDashboard() {
           <article className="run-result">
             <strong>Final response</strong>
             <MarkdownRenderer content={result.text} />
-            <SaveCodeButton content={result.text} />
+            {codeFiles.length === 0 && !result.verification?.is_software && <SaveCodeButton content={result.text} />}
           </article>
         )}
 
+        {result?.verification?.is_software && !result.verification.passed && (
+          <div className="run-error">
+            Export withheld: {result.verification.issues?.[0]?.message || 'the generated project did not pass verification.'}
+          </div>
+        )}
+
         {/* Full Codebase Export Card */}
-        {activeRun?.tasks.length ? (
-          <FullCodebaseExportBar tasks={activeRun.tasks} agentsById={agentsById} />
+        {codeFiles.length ? (
+          <FullCodebaseExportBar codeFiles={codeFiles} />
         ) : null}
 
         {/* Per-agent expandable cards */}

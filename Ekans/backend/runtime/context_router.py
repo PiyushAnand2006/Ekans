@@ -138,10 +138,21 @@ class ContextRouter:
 
         # 4. Response Guidelines
         prompt_parts.append(
-            "### Output Guidelines\n"
+            "### Output Guidelines & Code Fence Rules\n"
             "Produce complete, functional, executable deliverables.\n"
-            "- For software code files, ALWAYS specify the explicit relative file path in a header or comment above each code block (e.g. `// filename: frontend/src/App.tsx`, `// filename: backend/server.js`, or `// filename: frontend/package.json`).\n"
-            "- Ensure code is complete and runnable. Provide complete project scaffolding including package manifests (`package.json` or `requirements.txt`), configuration files, and main entrypoint files so the project can be executed immediately."
+            "CRITICAL CODE BLOCK RULE:\n"
+            "Every single code block MUST have an explicit relative file path on the first line after the code fence!\n"
+            "Correct Example:\n"
+            "```tsx frontend/src/App.tsx\n"
+            "export default function App() { ... }\n"
+            "```\n\n"
+            "Incorrect Example (WILL FAIL VERIFICATION):\n"
+            "```jsx\n"
+            "function App() { ... }\n"
+            "```\n\n"
+            "- Never omit the relative file path from code block headers.\n"
+            "- Do not use placeholder file names like code_1.ts or file.py.\n"
+            "- Ensure code is complete and runnable with appropriate entrypoints and dependency manifests."
         )
 
         return "\n\n".join(prompt_parts)

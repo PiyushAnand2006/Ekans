@@ -10,6 +10,12 @@ from pydantic import BaseModel, Field
 from backend.models.domain import AgentDefinition, AgentType
 
 
+SOFTWARE_OBJECTIVE = re.compile(
+    r"\b(app|application|website|web\s+site|api|backend|frontend|codebase|software|react|python|typescript|javascript)\b",
+    re.IGNORECASE,
+)
+
+
 class DecomposedTask(BaseModel):
     temp_id: str = Field(description="Temporary ID like 'task_1', 'task_2'")
     title: str = Field(description="Short descriptive title of the sub-task")
@@ -107,7 +113,10 @@ class TaskDecomposer:
             task = DecomposedTask(
                 temp_id="task_1",
                 title=f"{ai_agents[0].role}: Execute objective",
-                description=objective,
+                description=(
+                    f"{objective}\n\nFor a software deliverable, this task also owns complete project scaffolding, "
+                    "integration, verification, and run instructions."
+                ),
                 required_capability=ai_agents[0].role,
                 dependencies=[],
                 expected_output="Detailed task deliverable",
@@ -128,6 +137,8 @@ CRITICAL RULES:
 2. Ensure tasks have clear dependencies (temp_id references) for parallel or sequential execution.
 3. Independent tasks (e.g. Frontend and Backend after Architecture) should have NO dependencies on each other so they run in parallel.
 4. Output strictly valid JSON array with no extra markdown wrapping.
+5. For a software product, web application, API, or codebase objective, include a mandatory "Project scaffolding and integration" task. It must own manifests, entrypoints, configuration, integration, and final run instructions. Make it depend on all implementation tasks.
+6. For a software objective, include a "Verification and repair" task assigned to a QA/reviewer-capable agent when one is available. It must depend on the scaffolding/integration task and validate the complete artifact set against the objective.
 
 User Objective:
 {objective}
@@ -149,12 +160,60 @@ Output Format:
 
         text, _, _ = await self.complete_fn(lead_agent, decomposition_prompt)
         decomposed_tasks = self._parse_decomposition_json(text, objective, ai_agents)
+        if SOFTWARE_OBJECTIVE.search(objective):
+            decomposed_tasks = self._ensure_software_workflow(decomposed_tasks)
 
         for task in decomposed_tasks:
             assigned = AgentRouter.route_task(task, ai_agents)
             task.assigned_agent_id = assigned.id
 
         return decomposed_tasks
+
+    @staticmethod
+    def _ensure_software_workflow(tasks: list[DecomposedTask]) -> list[DecomposedTask]:
+        """Enforce integration and QA gates even when the planner forgets them."""
+        if not tasks:
+            return tasks
+        used_ids = {task.temp_id for task in tasks}
+
+        def next_id(prefix: str) -> str:
+            number = 1
+            while f"{prefix}_{number}" in used_ids:
+                number += 1
+            value = f"{prefix}_{number}"
+            used_ids.add(value)
+            return value
+
+        scaffold = next((task for task in tasks if re.search(r"scaffold|integration|project setup", f"{task.title} {task.description}", re.I)), None)
+        qa = next((task for task in tasks if re.search(r"verify|validation|quality|qa|test", f"{task.title} {task.description}", re.I)), None)
+        implementation_ids = [task.temp_id for task in tasks if task is not qa and task is not scaffold]
+
+        if scaffold is None:
+            scaffold = DecomposedTask(
+                temp_id=next_id("scaffold"),
+                title="Project scaffolding and integration",
+                description="Create or reconcile all manifests, entrypoints, configuration, dependency declarations, integration glue, and documented run commands for the complete generated project.",
+                required_capability="Lead Architect or Engineering Manager",
+                dependencies=implementation_ids,
+                expected_output="A complete, runnable project structure with exact relative paths for every file.",
+            )
+            tasks.append(scaffold)
+        else:
+            scaffold.dependencies = list(dict.fromkeys([*scaffold.dependencies, *implementation_ids]))
+
+        if qa is None:
+            qa = DecomposedTask(
+                temp_id=next_id("verify"),
+                title="Verification and repair",
+                description="Review the integrated artifact set against the user objective. Identify missing files, manifests, imports, entrypoints, and syntax issues; return complete corrected files where needed.",
+                required_capability="QA Reviewer",
+                dependencies=[scaffold.temp_id],
+                expected_output="A verified project or precise repair artifacts with explicit paths.",
+            )
+            tasks.append(qa)
+        elif scaffold.temp_id not in qa.dependencies:
+            qa.dependencies.append(scaffold.temp_id)
+        return tasks
 
     def _parse_decomposition_json(
         self,

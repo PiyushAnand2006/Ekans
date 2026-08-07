@@ -221,12 +221,6 @@ export function categorizeFilePath(rawPath: string, contextText: string, lang: s
     return `db/${filename}`;
   }
 
-  // Language fallback
-  const ext = extForLang(lang);
-  if (['py', 'js', 'ts', 'java', 'go', 'rs', 'cs', 'php'].includes(ext) && !filename.includes('.')) {
-    filename = `code_${index + 1}.${ext}`;
-  }
-
   return filename;
 }
 
@@ -271,6 +265,14 @@ export function extractCodeBlocks(markdown: string, defaultFolderPrefix: string 
 
       if (!filename) {
         filename = inferFilenameFromLines(lines, i - codeLines.length - 2, language, blockIndex);
+      }
+
+      // A code block without a semantic path cannot be safely exported.  Do not
+      // invent code_1.ts-style files: the backend quality gate will request a
+      // precise repair instead.
+      if (!filename || /(?:^|\/)(?:code|file|output)_?\d*\.[\w-]+$/i.test(filename)) {
+        blockIndex++;
+        continue;
       }
 
       // Categorize into subfolders (e.g. backend/server.js or frontend/public/index.html)
@@ -323,8 +325,7 @@ function inferFilenameFromLines(lines: string[], precedingIndex: number, lang: s
     }
   }
 
-  const ext = extForLang(lang);
-  return `code_${index + 1}.${ext}`;
+  return '';
 }
 
 // ── Aggregate code across all tasks/agents in a run ───────────────
@@ -334,8 +335,7 @@ function inferFilenameFromLines(lines: string[], precedingIndex: number, lang: s
  * Deduplicates files and assigns Lovable/Replit style subfolders.
  */
 export function collectRunCodeFiles(tasks: TaskDefinition[], agentsById: Map<string, AgentDefinition>): CodeBlock[] {
-  const allBlocks: CodeBlock[] = [];
-  const filenamesSeen = new Set<string>();
+  const filesByPath = new Map<string, CodeBlock>();
 
   for (const task of tasks) {
     const taskResult = task.result as { text?: string } | null;
@@ -362,18 +362,13 @@ export function collectRunCodeFiles(tasks: TaskDefinition[], agentsById: Map<str
     for (const block of blocks) {
       if (!block.isCode) continue;
 
-      let fn = block.filename;
-      if (filenamesSeen.has(fn)) {
-        const parts = fn.split('.');
-        const ext = parts.pop();
-        fn = `${parts.join('.')}_${filenamesSeen.size + 1}.${ext}`;
-      }
-      filenamesSeen.add(fn);
-      allBlocks.push({ ...block, filename: fn });
+      // A later correction replaces the earlier version of the same file.
+      // Renaming collisions creates a broken project, so never do that.
+      filesByPath.set(block.filename, block);
     }
   }
 
-  return allBlocks;
+  return [...filesByPath.values()];
 }
 
 // ── Write code blocks to local filesystem (with subfolders) ───────
