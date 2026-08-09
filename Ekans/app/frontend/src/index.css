@@ -1432,7 +1432,7 @@ body {
 .run-team-button, .run-cancel-button { padding: 9px 13px; border: 0; border-radius: 7px; cursor: pointer; font-weight: 650; }
 .run-team-button { color: #fff; background: var(--accent-blue); }.run-team-button:disabled { opacity: .6; cursor: wait; }
 .run-cancel-button { color: #fca5a5; background: rgba(239,68,68,.16); border: 1px solid rgba(239,68,68,.4); }
-.run-error { margin-top: 8px; font-size: 12px; color: #fca5a5; }.run-summary { margin-top: 8px; }
+.run-error { margin-top: 8px; font-size: 12px; color: #fca5a5; }.run-warning { margin-top: 8px; font-size: 12px; color: #fcd34d; }.run-summary { margin-top: 8px; }
 .run-result { margin-top: 10px; padding: 12px; border-radius: 8px; background: rgba(0,0,0,.22); border: 1px solid rgba(255,255,255,.05); color: var(--text-primary); font-size: 13px; }
 .run-result pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font: inherit; }.run-events { margin-top: 8px; font-size: 12px; color: var(--text-secondary); }.run-events div { display: flex; gap: 8px; padding: 2px 0; }.run-events span { min-width: 118px; color: var(--accent-blue); font-size: 10px; }
 

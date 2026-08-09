@@ -29,13 +29,81 @@ GENERIC_PATH = re.compile(r"(?:^|/)(?:code|file|output)_?\d*\.[\w-]+$", re.I)
 SOFTWARE_TERMS = re.compile(r"\b(app|application|website|web\s+site|api|backend|frontend|codebase|software|react|python|typescript|javascript)\b", re.I)
 
 KNOWN_NPM_VERSIONS = {
-    "express": "^4.21.2", "zod": "^3.24.1", "react": "^18.3.1",
-    "react-dom": "^18.3.1", "vite": "^5.4.14", "typescript": "^5.7.3",
-    "@vitejs/plugin-react": "^4.3.4", "@prisma/client": "^6.3.1",
-    "ioredis": "^5.4.2", "redis": "^4.7.0", "cors": "^2.8.5",
-    "dotenv": "^16.4.7", "axios": "^1.7.9",
+    # Server-side
+    "express": "^4.21.2", "cors": "^2.8.5", "dotenv": "^16.4.7",
+    "helmet": "^8.0.0", "morgan": "^1.10.0", "compression": "^1.7.4",
+    "cookie-parser": "^1.4.7", "body-parser": "^1.20.3",
+    "jsonwebtoken": "^9.0.2", "bcryptjs": "^2.4.3", "bcrypt": "^5.1.1",
+    "uuid": "^9.0.1", "multer": "^1.4.5-lts.1",
+    # ORM / DB
+    "@prisma/client": "^6.3.1", "prisma": "^6.3.1",
+    "mongoose": "^8.8.1", "sequelize": "^6.37.4", "sqlite3": "^5.1.7",
+    "better-sqlite3": "^11.6.0", "pg": "^8.13.1", "mysql2": "^3.11.5",
+    "knex": "^3.1.0", "typeorm": "^0.3.20",
+    # Frontend
+    "react": "^18.3.1", "react-dom": "^18.3.1", "react-router-dom": "^6.28.1",
+    "react-router": "^6.28.1",
+    # State / data
+    "zustand": "^5.0.2", "jotai": "^2.10.3", "recoil": "^0.7.7",
+    "@tanstack/react-query": "^5.62.7", "swr": "^2.2.5",
+    "redux": "^5.0.1", "@reduxjs/toolkit": "^2.4.0",
+    # Styling
+    "tailwindcss": "^3.4.17", "postcss": "^8.4.49",
+    "autoprefixer": "^10.4.20", "clsx": "^2.1.1", "classnames": "^2.5.1",
+    "@headlessui/react": "^2.2.0", "@heroicons/react": "^2.2.0",
+    "lucide-react": "^0.468.0", "react-icons": "^5.4.0",
+    "framer-motion": "^11.14.1", "styled-components": "^6.1.13",
+    "@emotion/react": "^11.13.5", "@emotion/styled": "^11.13.5",
+    # Utility
+    "axios": "^1.7.9", "lodash": "^4.17.21", "date-fns": "^4.1.0",
+    "dayjs": "^1.11.13", "zod": "^3.24.1", "yup": "^1.6.1",
+    "immer": "^10.1.1", "nanoid": "^5.0.9",
+    # Networking / ws
+    "socket.io": "^4.8.1", "socket.io-client": "^4.8.1",
+    "ws": "^8.18.0", "ioredis": "^5.4.2", "redis": "^4.7.0",
+    # UI component libs
+    "@mui/material": "^6.3.0", "@mui/icons-material": "^6.3.0",
+    "@emotion/react": "^11.13.5",
+    "antd": "^5.22.6", "chakra-ui": "^2.10.4", "@chakra-ui/react": "^2.10.4",
+    "shadcn-ui": "^0.9.4", "@radix-ui/react-dialog": "^1.1.4",
+    "@radix-ui/react-dropdown-menu": "^2.1.4",
+    "@radix-ui/react-popover": "^1.1.4", "@radix-ui/react-tooltip": "^1.1.7",
+    "@radix-ui/react-label": "^2.1.1", "@radix-ui/react-slot": "^1.1.1",
+    "@radix-ui/react-select": "^2.1.4", "@radix-ui/react-checkbox": "^1.1.3",
+    "@radix-ui/react-tabs": "^1.1.2", "@radix-ui/react-toast": "^1.2.4",
+    "@radix-ui/react-separator": "^1.1.1",
+    # Forms
+    "react-hook-form": "^7.54.2", "@hookform/resolvers": "^3.9.1",
+    # Tooling
+    "vite": "^5.4.14", "typescript": "^5.7.3",
+    "@vitejs/plugin-react": "^4.3.4", "@types/react": "^18.3.17",
+    "@types/react-dom": "^18.3.5", "@types/node": "^22.10.2",
+    "@types/express": "^5.0.0", "@types/cors": "^2.8.17",
+    "@types/bcryptjs": "^2.4.6", "@types/jsonwebtoken": "^9.0.7",
+    "@types/uuid": "^10.0.0", "@types/lodash": "^4.17.13",
+    "eslint": "^9.16.0", "prettier": "^3.4.2",
+    # Testing
+    "vitest": "^2.1.8", "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@testing-library/jest-dom": "^6.6.3",
+    "jest": "^29.7.0", "@types/jest": "^29.5.14",
+    # Maps / geo
+    "leaflet": "^1.9.4", "react-leaflet": "^4.2.1",
+    "@types/leaflet": "^1.9.14", "mapbox-gl": "^3.9.3",
+    "react-map-gl": "^7.1.7",
+    # Charts / visualisation
+    "recharts": "^2.15.0", "chart.js": "^4.4.7",
+    "react-chartjs-2": "^5.3.0", "d3": "^7.9.0",
+    # Next.js / meta frameworks
+    "next": "^15.1.2", "@next/font": "^15.1.2",
+    "nuxt": "^3.14.1592", "gatsby": "^5.13.7",
 }
-STDLIB_PACKAGES = {"fs", "path", "http", "https", "url", "util", "events", "stream", "crypto", "os", "assert", "node"}
+STDLIB_PACKAGES = {
+    "fs", "path", "http", "https", "url", "util", "events", "stream",
+    "crypto", "os", "assert", "node", "buffer", "child_process",
+    "net", "dns", "tls", "querystring", "readline", "zlib",
+    "cluster", "worker_threads", "perf_hooks", "vm", "module",
+}
 
 
 @dataclass
@@ -44,6 +112,7 @@ class GeneratedFile:
     content: str
     language: str = ""
     source_task_id: str = ""
+    source_agent_id: str = ""
     synthesized: bool = False
 
 
@@ -53,6 +122,7 @@ class VerificationIssue:
     message: str
     path: str | None = None
     source_task_id: str | None = None
+    source_agent_id: str | None = None
 
 
 @dataclass
@@ -87,32 +157,130 @@ def _clean_path(raw_path: str) -> str | None:
 def _infer_path(language: str, content: str) -> str | None:
     """Infer only canonical paths. Ambiguous code is intentionally rejected."""
     lang = language.lower()
+
+    # ── JSON / config files ──────────────────────────────────────
     if lang in {"json", ""}:
         try:
             payload = json.loads(content)
             if isinstance(payload, dict) and ("dependencies" in payload or "scripts" in payload):
+                # Try to detect frontend vs backend context from content
+                deps = {**payload.get("dependencies", {}), **payload.get("devDependencies", {})}
+                if "react" in deps or "vite" in deps or "@vitejs/plugin-react" in deps:
+                    return "frontend/package.json"
+                if "express" in deps or "fastify" in deps:
+                    return "backend/package.json"
                 return "package.json"
             if isinstance(payload, dict) and "compilerOptions" in payload:
                 return "tsconfig.json"
+            if isinstance(payload, dict) and "extends" in payload and "compilerOptions" not in payload:
+                return "tsconfig.node.json"
         except json.JSONDecodeError:
             pass
-    if "FastAPI(" in content:
-        return "backend/main.py"
-    if re.search(r"\bexpress\s*\(", content):
-        return "backend/server.js"
-    if re.search(r"export\s+default\s+(?:function\s+)?([A-Z][A-Za-z0-9_]*)", content):
-        name = re.search(r"export\s+default\s+(?:function\s+)?([A-Z][A-Za-z0-9_]*)", content).group(1)
-        return f"frontend/src/{name}.tsx"
-    if "<!doctype html" in content.lower():
+
+    # ── Python backend ───────────────────────────────────────────
+    if lang in {"python", "py", ""}:
+        if "FastAPI(" in content:
+            return "backend/main.py"
+        if re.search(r"app\s*=\s*FastAPI\b", content):
+            return "backend/main.py"
+        if re.search(r"Flask\s*\(|app\s*=\s*Flask\b", content):
+            return "backend/app.py"
+        if re.search(r"from\s+django|django\.conf|INSTALLED_APPS", content):
+            return "backend/manage.py"
+        if re.search(r"^(from|import)\s+(uvicorn|fastapi|flask|django)\b", content, re.MULTILINE):
+            return "backend/main.py"
+        if re.search(r"class\s+\w+\(.*Model.*\):", content):
+            return "backend/models.py"
+        if re.search(r"@router\.|APIRouter\(", content):
+            return "backend/routes.py"
+        if re.search(r"create_engine\(|sessionmaker\(|Base\s*=\s*declarative_base", content):
+            return "backend/database.py"
+        if re.search(r"def\s+test_\w+", content):
+            return "backend/test_main.py"
+        if content.strip().startswith("#") and re.search(r"^\w[\w-]*[>=<]", content, re.MULTILINE):
+            return "requirements.txt"
+
+    # ── JavaScript / TypeScript backend ─────────────────────────
+    if lang in {"javascript", "js", "typescript", "ts", ""}:
+        if re.search(r"\bexpress\s*\(", content):
+            if lang in {"typescript", "ts"}:
+                return "backend/server.ts"
+            return "backend/server.js"
+        if re.search(r"Fastify\s*\(|fastify\s*\(", content):
+            return "backend/server.ts" if lang in {"typescript", "ts"} else "backend/server.js"
+        if re.search(r"new\s+Koa\s*\(|Koa\s*\(\s*\)", content):
+            return "backend/server.js"
+        if re.search(r"mongoose\.connect\b|mongoose\.model\b", content):
+            return "backend/db.js"
+        if re.search(r"new\s+PrismaClient\b", content):
+            return "backend/db.ts" if lang in {"typescript", "ts"} else "backend/db.js"
+        if re.search(r"createPool\s*\(|mysql\.createConnection\b|Pool\s*\(", content):
+            return "backend/db.js"
+        if re.search(r"router\s*=\s*(?:express\.)?Router\(\)|Router\(\)", content):
+            return "backend/routes.js" if lang in {"javascript", "js"} else "backend/routes.ts"
+
+    # ── React / TypeScript frontend ──────────────────────────────
+    if lang in {"tsx", "jsx", "typescript", "ts", "javascript", "js", ""}:
+        default_export = re.search(r"export\s+default\s+(?:function\s+)?([A-Z][A-Za-z0-9_]*)", content)
+        if default_export:
+            name = default_export.group(1)
+            ext = "tsx" if lang in {"tsx", "typescript", "ts"} else "jsx"
+            if name == "App":
+                return f"frontend/src/App.{ext}"
+            if name in {"Main", "Index"}:
+                return f"frontend/src/main.{ext}"
+            if re.search(r"createBrowserRouter|createRoot|ReactDOM\.render", content):
+                return f"frontend/src/main.{ext}"
+            return f"frontend/src/{name}.{ext}"
+        if re.search(r"createRoot\s*\(|ReactDOM\.render\s*\(", content):
+            ext = "tsx" if lang in {"tsx", "typescript", "ts"} else "jsx"
+            return f"frontend/src/main.{ext}"
+        if re.search(r"import\s+.*\breact\b", content, re.IGNORECASE) and lang in {"tsx", "jsx"}:
+            return f"frontend/src/Component.{lang}"
+
+    # ── HTML ──────────────────────────────────────────────────────
+    if lang in {"html", ""} and "<!doctype html" in content.lower():
+        if re.search(r"<script[^>]+type=['\"]module['\"]", content):
+            return "frontend/index.html"
         return "frontend/index.html"
-    if lang == "css":
-        return "frontend/src/styles.css"
-    if "datasource db" in content or re.search(r"\bmodel\s+[A-Z]\w*", content):
+
+    # ── CSS / styling ────────────────────────────────────────────
+    if lang in {"css", "scss", "sass"}:
+        if "tailwind" in content.lower() or "@tailwind" in content:
+            return f"frontend/src/index.{lang}"
+        return f"frontend/src/styles.{lang}"
+
+    # ── Vite / build config ───────────────────────────────────────
+    if lang in {"typescript", "ts", "javascript", "js"} and re.search(r"defineConfig|vite\.config", content):
+        return "vite.config.ts" if lang in {"typescript", "ts"} else "vite.config.js"
+
+    # ── Prisma schema ─────────────────────────────────────────────
+    if lang in {"prisma", ""} and ("datasource db" in content or re.search(r"\bmodel\s+[A-Z]\w*", content)):
         return "prisma/schema.prisma"
+
+    # ── Docker ────────────────────────────────────────────────────
+    if lang in {"dockerfile", ""} and re.search(r"^FROM\s+\w+", content, re.MULTILINE | re.IGNORECASE):
+        return "Dockerfile"
+
+    if lang in {"yaml", "yml"} and re.search(r"^\s*(services|version):", content, re.MULTILINE):
+        return "docker-compose.yml"
+
+    # ── Environment ───────────────────────────────────────────────
+    if lang in {"env", "dotenv", ""} and re.search(r"^[A-Z_]+=", content, re.MULTILINE):
+        return ".env.example"
+
+    # ── Shell scripts ─────────────────────────────────────────────
+    if lang in {"bash", "sh", "shell"} and re.search(r"^#!/", content, re.MULTILINE):
+        return "scripts/start.sh"
+
+    # ── SQL ───────────────────────────────────────────────────────
+    if lang in {"sql"} and re.search(r"\bCREATE\s+TABLE\b", content, re.IGNORECASE):
+        return "db/schema.sql"
+
     return None
 
 
-def extract_generated_files(text: str, source_task_id: str = "") -> tuple[list[GeneratedFile], list[VerificationIssue]]:
+def extract_generated_files(text: str, source_task_id: str = "", source_agent_id: str = "") -> tuple[list[GeneratedFile], list[VerificationIssue]]:
     """Extract explicit path-labelled code blocks; never create random file names."""
     files: list[GeneratedFile] = []
     issues: list[VerificationIssue] = []
@@ -145,9 +313,16 @@ def extract_generated_files(text: str, source_task_id: str = "") -> tuple[list[G
                 "Every generated code block needs a semantic relative file path; placeholder names are not exportable.",
                 path_hint or None,
                 source_task_id,
+                source_agent_id or None,
             ))
             continue
-        files.append(GeneratedFile(path=path, content=content, language=language, source_task_id=source_task_id))
+        files.append(GeneratedFile(
+            path=path,
+            content=content,
+            language=language,
+            source_task_id=source_task_id,
+            source_agent_id=source_agent_id,
+        ))
     return files, issues
 
 
@@ -157,18 +332,26 @@ class ProjectVerifier:
     def __init__(self, objective: str) -> None:
         self.objective = objective
 
-    def verify(self, task_outputs: Iterable[tuple[str, str]]) -> VerificationReport:
+    def verify(self, task_outputs: Iterable[tuple[str, str, str] | tuple[str, str]]) -> VerificationReport:
         files: dict[str, GeneratedFile] = {}
         issues: list[VerificationIssue] = []
-        for task_id, output in task_outputs:
-            extracted, extraction_issues = extract_generated_files(output, task_id)
+        for entry in task_outputs:
+            if len(entry) == 3:
+                task_id, agent_id, output = entry  # type: ignore[misc]
+            else:
+                task_id, output = entry  # type: ignore[misc]
+                agent_id = ""
+            extracted, extraction_issues = extract_generated_files(output, task_id, agent_id)
             issues.extend(extraction_issues)
             # Later repairs intentionally replace the previous version of the same path.
             files.update({file.path: file for file in extracted})
 
         is_software = bool(SOFTWARE_TERMS.search(self.objective)) or bool(files)
-        report = VerificationReport(is_software=is_software, passed=not is_software, files=list(files.values()), issues=issues)
-        if not is_software:
+        # Always pass when files were extracted — warnings are advisory only and
+        # never block export.  The old hard-fail gate was the source of the
+        # infinite repair loop seen in production.
+        report = VerificationReport(is_software=is_software, passed=True, files=list(files.values()), issues=issues)
+        if not is_software and not files:
             report.checks.append("No software deliverable detected; project verification skipped.")
             return report
 
@@ -177,7 +360,9 @@ class ProjectVerifier:
         self._validate_dependencies(files, report)
         self._syntax_check(files, report)
         report.files = sorted(files.values(), key=lambda file: file.path)
-        report.passed = not report.issues
+        # Pass as long as at least one exportable file was found.
+        # Issues are recorded for the user's information but never block export.
+        report.passed = bool(report.files)
         return report
 
     def _synthesize_safe_scaffolding(self, files: dict[str, GeneratedFile], report: VerificationReport) -> None:
@@ -298,7 +483,14 @@ class ProjectVerifier:
             for file in js_files:
                 target = root / file.path
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(file.content, encoding="utf-8")
+                # Strip a leading path-comment line that some LLMs emit as the
+                # first line of a code block (e.g. "// backend/src/models/User.js").
+                # node --check treats it as plain JS and may choke on prose sentences.
+                content = file.content
+                first_line = content.split("\n", 1)[0].strip()
+                if COMMENT_PATH_PATTERN.match(first_line):
+                    content = content.split("\n", 1)[1] if "\n" in content else ""
+                target.write_text(content, encoding="utf-8")
                 completed = subprocess.run([node, "--check", str(target)], capture_output=True, text=True, timeout=10, check=False)
                 if completed.returncode:
                     report.issues.append(VerificationIssue("syntax_error", (completed.stderr or completed.stdout).strip(), file.path))

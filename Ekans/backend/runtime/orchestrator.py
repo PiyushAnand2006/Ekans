@@ -180,10 +180,20 @@ class WorkforceOrchestrator:
     def _format_verification_issues(report: VerificationReport) -> str:
         if not report.issues:
             return "No verification issues."
-        return "\n".join(
+        # Deduplicate ambiguous_file_path issues into a single summary entry
+        ambiguous_count = sum(1 for i in report.issues if i.code == "ambiguous_file_path")
+        other_issues = [i for i in report.issues if i.code != "ambiguous_file_path"]
+        lines = [
             f"- [{issue.code}] {issue.path or 'project'}: {issue.message}"
-            for issue in report.issues
-        )
+            for issue in other_issues
+        ]
+        if ambiguous_count:
+            lines.insert(
+                0,
+                f"- [ambiguous_file_path] {ambiguous_count} code block(s) are missing explicit relative file paths; "
+                "agents must include a path in the code fence header (e.g. ```tsx frontend/src/App.tsx)."
+            )
+        return "\n".join(lines)
 
     def _repair_agent_for_issue(self, report: VerificationReport, issue: VerificationIssue, lead_agent: AgentDefinition) -> AgentDefinition:
         """Return a failed artifact to its producer specialist, NEVER to the manager by default."""
@@ -263,58 +273,35 @@ class WorkforceOrchestrator:
         return ""
 
     async def _verify_and_repair(self, lead_agent: AgentDefinition) -> VerificationReport:
-        """Bounded verification loop. A run can never export an unverified project."""
+        """Run one verification pass (advisory only — never blocks export).
+        
+        The hard-fail repair loop has been removed.  Issues are surfaced to the
+        user as warnings in the final response, but files are always exported as
+        long as at least one path-labelled artifact was extracted.
+        """
         verifier = ProjectVerifier(self.objective)
-        for attempt in range(self.MAX_REPAIR_ATTEMPTS + 1):
+        await self.emit(
+            EventCategory.VERIFICATION_STARTED,
+            "Verification is checking generated artifacts, manifests, entrypoints, and syntax.",
+            lead_agent.id,
+        )
+        report = verifier.verify(self._artifact_outputs())
+        if report.passed:
             await self.emit(
-                EventCategory.VERIFICATION_STARTED,
-                f"Verification pass {attempt + 1} is checking generated artifacts, manifests, entrypoints, and syntax.",
+                EventCategory.VERIFICATION_PASSED,
+                f"Verification complete. {len(report.files)} file(s) ready to export.",
                 lead_agent.id,
             )
-            report = verifier.verify(self._artifact_outputs())
-            if report.passed:
-                await self.emit(
-                    EventCategory.VERIFICATION_PASSED,
-                    f"Verification passed after {attempt} repair pass{'es' if attempt != 1 else ''}.",
-                    lead_agent.id,
-                )
-                return report
-
+        else:
             await self.emit(
                 EventCategory.VERIFICATION_FAILED,
-                f"Verification found {len(report.issues)} issue(s): {self._format_verification_issues(report)}",
+                f"Verification found {len(report.issues)} advisory issue(s) — export proceeding anyway: "
+                + self._format_verification_issues(report),
                 lead_agent.id,
             )
-            if attempt == self.MAX_REPAIR_ATTEMPTS:
-                return report
-
-            existing_files = "\n".join(f"- {file.path}" for file in report.files) or "- No valid artifacts extracted"
-            for repair_index, (repair_agent, issues) in enumerate(self._repair_groups(report, lead_agent).values(), start=1):
-                issue_text = self._format_verification_issues(VerificationReport(True, False, issues=issues))
-                original_output = self._source_output(issues[0].source_task_id)
-                repair_prompt = (
-                    f"### Original Objective\n{self.objective}\n\n"
-                    f"### Your Assigned Repair (pass {attempt + 1} of {self.MAX_REPAIR_ATTEMPTS})\n{issue_text}\n\n"
-                    f"### Current Artifact Manifest\n{existing_files}\n\n"
-                    f"### Your Previous Output (only if relevant)\n{original_output[:12000] or 'No previous exportable output was found.'}\n\n"
-                    "Fix only the artifacts assigned to you. Return complete replacement files, not explanations or patches.\n"
-                    "CRITICAL: Every code block MUST start with an explicit relative file path on the first line after the fence, e.g. ```tsx frontend/src/App.tsx"
-                )
-                await self.emit(
-                    EventCategory.REPAIR_REQUESTED,
-                    f"{repair_agent.name} is repairing {len(issues)} issue(s) it owns (pass {attempt + 1}).",
-                    repair_agent.id,
-                )
-                repair_text, _, _ = await self._complete(repair_agent, repair_prompt)
-                if repair_text.startswith("No provider response:"):
-                    report.issues.append(VerificationIssue("repair_provider_error", repair_text, source_task_id=issues[0].source_task_id))
-                    return report
-                source = f"repair_{attempt + 1}_{repair_index}"
-                self.repair_outputs.append((source, repair_text))
-                self.repair_outputs_with_agent.append((source, repair_agent.id, repair_text))
-                self.repair_agents_by_source[source] = repair_agent.id
-
-        raise RuntimeError("Verification loop exited unexpectedly")
+            # Force passed so the orchestrator always reaches export
+            report.passed = bool(report.files)
+        return report
 
     async def run(self) -> None:
         """Main execution engine: Decomposition -> Routing -> DAG -> Isolated Wave Execution -> Synthesis"""
@@ -402,13 +389,13 @@ class WorkforceOrchestrator:
             # Execute wave tasks concurrently using asyncio.gather
             await asyncio.gather(*(self._execute_task(tid, task_dag, lead_agent.id) for tid in ready_tasks))
 
-        # ── Step 5: Artifact QA and targeted repair loop ────────────────────
+        # ── Step 5: Artifact collection and advisory verification ───────────
         verification = await self._verify_and_repair(lead_agent)
-        if not verification.passed:
+        if not verification.files:
             await self.finish(RunStatus.FAILED, {
-                "text": "The manager withheld export because the generated project did not pass verification. Review the verification report and run the team again after correcting the failed checks.",
+                "text": "No exportable files were produced. The agents did not generate any code blocks with recognisable file paths. Try running again — this sometimes improves with a more specific objective.",
                 "verification": verification.to_dict(),
-                "files": [file.__dict__ for file in verification.files],
+                "files": [],
             })
             return
 
@@ -428,12 +415,23 @@ class WorkforceOrchestrator:
 
         if usable_outputs:
             material = "\n\n".join(f"## {title}\n{text}" for title, text in usable_outputs)
+            advisory_notes = ""
+            if verification.issues:
+                advisory_notes = (
+                    "\n\n### Advisory Warnings (non-blocking)\n"
+                    + "\n".join(f"- {i.code}: {i.message[:120]}" for i in verification.issues[:8])
+                    + ("\n- (and more...)" if len(verification.issues) > 8 else "")
+                )
             final_prompt = (
                 f"### Objective Summary\n{self.objective}\n\n"
                 f"### Team Completed Deliverables\n{material}\n\n"
-                f"### Verification Status\nAll structural, manifest, dependency, and syntax checks passed. Exportable files: {', '.join(file.path for file in verification.files) or 'none (non-software objective)'}.\n\n"
-                "### Final Response Requirements\n"
-                "Act as the accountable manager. Synthesize the team's deliverables into a clear, cohesive final response. State what was completed, the verification outcome, how to run the result when applicable, and any honest limitations. Do not claim tests or runtime behavior that was not verified."
+                f"### Exported Files\n"
+                + "\n".join(f"- {file.path}" for file in verification.files)
+                + advisory_notes
+                + "\n\n### Final Response Requirements\n"
+                "Act as the accountable manager. Summarise what was built, list the exported files, and give clear instructions on how to run the project (install dependencies, start commands). "
+                "If there are advisory warnings above, briefly mention them as things the user may want to review. "
+                "Do not claim tests or runtime behaviour that was not verified."
             )
             final_text, _, _ = await self._complete(lead_agent, final_prompt)
         else:

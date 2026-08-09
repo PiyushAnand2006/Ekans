@@ -23,7 +23,9 @@ type VerifiedRunResult = {
 };
 
 function verifiedCodeFiles(result: VerifiedRunResult | null): CodeBlock[] {
-  if (!result?.verification?.passed || !Array.isArray(result.files)) return [];
+  // Accept files whenever the backend extracted at least one file, regardless
+  // of the advisory verification flag.
+  if (!Array.isArray(result?.files) || result.files.length === 0) return [];
   return result.files
     .filter((file) => typeof file.path === 'string' && typeof file.content === 'string')
     .map((file) => ({ filename: file.path, content: file.content, language: file.language || '', isCode: true }));
@@ -612,9 +614,9 @@ export function RunDashboard() {
           </article>
         )}
 
-        {result?.verification?.is_software && !result.verification.passed && (
-          <div className="run-error">
-            Export withheld: {result.verification.issues?.[0]?.message || 'the generated project did not pass verification.'}
+        {result?.verification?.issues && result.verification.issues.length > 0 && (
+          <div className="run-warning">
+            Advisory: {result.verification.issues.length} check(s) flagged — review the exported files before running.
           </div>
         )}
 
