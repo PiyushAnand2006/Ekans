@@ -39,6 +39,35 @@ class TaskDAG:
 
         return node
 
+    def add_dependency(self, task_id: str, dependency_id: str) -> bool:
+        """Add an edge only when it preserves acyclicity.
+
+        Tasks can be injected while a run is underway. This accepts an
+        arbitrary non-linear graph while rejecting a feedback edge that would
+        turn it into an unbounded scheduling cycle.
+        """
+        if task_id == dependency_id:
+            return False
+        self.add_task(task_id)
+        self.add_task(dependency_id)
+        if dependency_id in self.nodes[task_id].dependencies:
+            return True
+
+        stack = [dependency_id]
+        seen: set[str] = set()
+        while stack:
+            current = stack.pop()
+            if current == task_id:
+                return False
+            if current in seen:
+                continue
+            seen.add(current)
+            stack.extend(self.nodes[current].dependents)
+
+        self.nodes[task_id].dependencies.add(dependency_id)
+        self.nodes[dependency_id].dependents.add(task_id)
+        return True
+
     def validate_dag(self) -> None:
         """Validate DAG using Kahn's algorithm. Detects cycles or missing nodes."""
         in_degree: dict[str, int] = {node_id: len(node.dependencies) for node_id, node in self.nodes.items()}

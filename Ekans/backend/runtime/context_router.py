@@ -102,13 +102,15 @@ class ContextRouter:
         agent: AgentDefinition,
         task: TaskDefinition,
         objective: str,
-        upstream_tasks: list[TaskDefinition]
+        upstream_tasks: list[TaskDefinition],
+        peer_messages: list[dict] | None = None,
     ) -> str:
         """Builds an isolated task prompt containing ONLY:
         - Concise objective summary
         - Deliverables & handoff context from DIRECT upstream dependencies
+        - Any peer messages this agent received and their replies
         - Current task title, description & expected output
-        - Structured output format
+        - Structured output format + peer-communication protocol
         """
         prompt_parts: list[str] = []
 
@@ -129,14 +131,27 @@ class ContextRouter:
             if handoff_parts:
                 prompt_parts.append("### Upstream Prerequisite Deliverables\n" + "\n\n".join(handoff_parts))
 
-        # 3. Current Task Details
+        # 3. Peer messages this agent received (with resolved replies)
+        if peer_messages:
+            msg_parts = []
+            for m in peer_messages:
+                if m.get("resolved") and m.get("reply"):
+                    msg_parts.append(
+                        f"**From {m['from']} (re: {m['subject']}):**\n"
+                        f"{m['body']}\n"
+                        f"**Your reply:** {m['reply']}"
+                    )
+            if msg_parts:
+                prompt_parts.append("### Peer Clarifications Received\n" + "\n\n".join(msg_parts))
+
+        # 4. Current Task Details
         prompt_parts.append(
             f"### Your Assigned Task: {task.title}\n"
             f"**Task Description:** {task.description}\n"
             f"**Expected Deliverable:** {task.expected_output or 'Produce clear, functional, actionable output.'}"
         )
 
-        # 4. Response Guidelines
+        # 5. Response Guidelines + peer-ask protocol
         prompt_parts.append(
             "### Output Guidelines & Code Fence Rules\n"
             "Produce complete, functional, executable deliverables.\n"
@@ -152,7 +167,21 @@ class ContextRouter:
             "```\n\n"
             "- Never omit the relative file path from code block headers.\n"
             "- Do not use placeholder file names like code_1.ts or file.py.\n"
-            "- Ensure code is complete and runnable with appropriate entrypoints and dependency manifests."
+            "- Ensure code is complete and runnable with appropriate entrypoints and dependency manifests.\n\n"
+            "### Peer Communication Protocol\n"
+            "If you need clarification from another agent BEFORE you can complete your work, "
+            "output a JSON block like this INSTEAD of your deliverable:\n"
+            "```json\n"
+            '{"ask": "<agent_role_or_name>", "subject": "<short topic>", "question": "<your question>"}\n'
+            "```\n"
+            "The system will route your question, get an answer, and re-run your task with the reply included.\n"
+            "Only ask if truly blocked — if you have enough context, proceed directly."
+            "\n\n### Dynamic Task Injection\n"
+            "If you discover follow-up work another role should own, include this JSON block alongside your deliverable:\n"
+            "```json\n"
+            '{"delegate": "<agent_role_or_name>", "title": "<short task>", "description": "<precise work needed>", "expected_output": "<deliverable>"}\n'
+            "```\n"
+            "The manager will add it as a follow-on task. Use this only for concrete work."
         )
 
         return "\n\n".join(prompt_parts)

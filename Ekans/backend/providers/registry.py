@@ -68,7 +68,12 @@ class OpenAICompatibleProvider(ModelProvider):
                 response.raise_for_status()
                 data = response.json()
             usage = data.get("usage", {})
-            return Completion(data["choices"][0]["message"]["content"], usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
+            choice = data["choices"][0]
+            return Completion(
+                choice["message"].get("content") or "",
+                usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0),
+                str(choice.get("finish_reason") or ""),
+            )
         except (httpx.HTTPError, KeyError, IndexError, TypeError) as exc:
             raise ProviderError(f"OpenAI-compatible provider: {exc}") from exc
 
@@ -104,7 +109,10 @@ class AnthropicProvider(ModelProvider):
                 response.raise_for_status()
                 data = response.json()
             usage = data.get("usage", {})
-            return Completion(data["content"][0]["text"], usage.get("input_tokens", 0), usage.get("output_tokens", 0))
+            return Completion(
+                data["content"][0]["text"], usage.get("input_tokens", 0), usage.get("output_tokens", 0),
+                str(data.get("stop_reason") or ""),
+            )
         except (httpx.HTTPError, KeyError, IndexError, TypeError) as exc:
             raise ProviderError(f"Anthropic provider: {exc}") from exc
 
@@ -128,7 +136,12 @@ class GeminiProvider(ModelProvider):
                 response.raise_for_status()
                 data = response.json()
             usage = data.get("usageMetadata", {})
-            return Completion(data["candidates"][0]["content"]["parts"][0]["text"], usage.get("promptTokenCount", 0), usage.get("candidatesTokenCount", 0))
+            candidate = data["candidates"][0]
+            return Completion(
+                candidate["content"]["parts"][0]["text"],
+                usage.get("promptTokenCount", 0), usage.get("candidatesTokenCount", 0),
+                str(candidate.get("finishReason") or ""),
+            )
         except (httpx.HTTPError, KeyError, IndexError, TypeError) as exc:
             raise ProviderError(f"Google provider: {exc}") from exc
 

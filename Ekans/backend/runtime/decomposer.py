@@ -136,9 +136,11 @@ CRITICAL RULES:
 1. Do NOT create tasks for unneeded agents. If an objective only requires 1 or 2 specialists, create ONLY those sub-tasks.
 2. Ensure tasks have clear dependencies (temp_id references) for parallel or sequential execution.
 3. Independent tasks (e.g. Frontend and Backend after Architecture) should have NO dependencies on each other so they run in parallel.
-4. Output strictly valid JSON array with no extra markdown wrapping.
-5. For a software product, web application, API, or codebase objective, include a mandatory "Project scaffolding and integration" task. It must own manifests, entrypoints, configuration, integration, and final run instructions. Make it depend on all implementation tasks.
-6. For a software objective, include a "Verification and repair" task assigned to a QA/reviewer-capable agent when one is available. It must depend on the scaffolding/integration task and validate the complete artifact set against the objective.
+4. Use dependencies for real information constraints, not reporting hierarchy. Start foundational analysis, architecture, or strategy before work that needs it, but allow independent specialists to run concurrently.
+5. The plan is an initial graph, not a rigid pipeline: agents can ask peers and inject bounded follow-up tasks when they discover a gap.
+6. Output strictly valid JSON array with no extra markdown wrapping.
+7. For a software product, web application, API, or codebase objective, include a mandatory "Project scaffolding and integration" task. It must own manifests, entrypoints, configuration, integration, and final run instructions. Make it depend on all implementation tasks.
+8. For a software objective, include a "Verification and repair" task assigned to a QA/reviewer-capable agent when one is available. It must depend on the scaffolding/integration task and validate the complete artifact set against the objective.
 
 User Objective:
 {objective}
