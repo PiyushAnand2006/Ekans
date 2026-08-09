@@ -1433,6 +1433,23 @@ body {
 .run-team-button { color: #fff; background: var(--accent-blue); }.run-team-button:disabled { opacity: .6; cursor: wait; }
 .run-cancel-button { color: #fca5a5; background: rgba(239,68,68,.16); border: 1px solid rgba(239,68,68,.4); }
 .run-error { margin-top: 8px; font-size: 12px; color: #fca5a5; }.run-warning { margin-top: 8px; font-size: 12px; color: #fcd34d; }.run-summary { margin-top: 8px; }
+.agent-comms-panel { margin-top: 10px; border-radius: 8px; background: rgba(0,0,0,.18); border: 1px solid rgba(99,102,241,.25); overflow: hidden; }
+.agent-comms-header { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: none; border: none; cursor: pointer; color: var(--text-primary); font-size: 12px; text-align: left; }
+.agent-comms-header:hover { background: rgba(255,255,255,.04); }
+.agent-comms-icon { font-size: 14px; }
+.agent-comms-title { font-weight: 600; flex: 1; }
+.agent-comms-badge { background: rgba(99,102,241,.35); color: #a5b4fc; font-size: 10px; padding: 1px 6px; border-radius: 10px; }
+.agent-comms-chevron { font-size: 9px; color: var(--text-secondary); }
+.agent-comms-body { padding: 0 12px 10px; display: flex; flex-direction: column; gap: 8px; }
+.agent-comm-item { background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); border-radius: 6px; padding: 8px 10px; font-size: 12px; }
+.agent-comm-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
+.comm-from { color: #60a5fa; font-weight: 600; }
+.comm-arrow { color: var(--text-secondary); }
+.comm-to { color: #34d399; font-weight: 600; }
+.comm-subject { color: var(--text-secondary); font-size: 11px; background: rgba(255,255,255,.06); padding: 1px 6px; border-radius: 4px; }
+.agent-comm-question { color: var(--text-primary); margin-bottom: 6px; line-height: 1.5; }
+.agent-comm-reply { color: #a3e635; font-size: 11px; border-left: 2px solid rgba(163,230,53,.4); padding-left: 8px; line-height: 1.5; }
+.comm-reply-label { font-weight: 600; }
 .run-result { margin-top: 10px; padding: 12px; border-radius: 8px; background: rgba(0,0,0,.22); border: 1px solid rgba(255,255,255,.05); color: var(--text-primary); font-size: 13px; }
 .run-result pre { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; font: inherit; }.run-events { margin-top: 8px; font-size: 12px; color: var(--text-secondary); }.run-events div { display: flex; gap: 8px; padding: 2px 0; }.run-events span { min-width: 118px; color: var(--accent-blue); font-size: 10px; }
 
@@ -1491,7 +1508,7 @@ body {
 .agent-event-msg { color: var(--text-secondary); }
 
 /* Output */
-.agent-task-card-output { margin: 0; padding: 10px; border-radius: 6px; background: rgba(0,0,0,.2); border: 1px solid rgba(255,255,255,.04); color: var(--text-primary); max-height: 300px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.1) transparent; }
+.agent-task-card-output { margin: 0; padding: 10px; border-radius: 6px; background: rgba(0,0,0,.2); border: 1px solid rgba(255,255,255,.04); color: var(--text-primary); overflow: visible; }
 
 /* ── Markdown Rendered Typography ─────────────────────────────── */
 

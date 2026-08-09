@@ -88,6 +88,10 @@ class EventCategory(str, Enum):
     VERIFICATION_FAILED = "VERIFICATION_FAILED"
     REPAIR_REQUESTED = "REPAIR_REQUESTED"
     VERIFICATION_PASSED = "VERIFICATION_PASSED"
+    AGENT_MESSAGE_SENT = "AGENT_MESSAGE_SENT"
+    AGENT_MESSAGE_REPLIED = "AGENT_MESSAGE_REPLIED"
+    AGENT_BLOCKED = "AGENT_BLOCKED"
+    AGENT_UNBLOCKED = "AGENT_UNBLOCKED"
     RUN_COMPLETED = "RUN_COMPLETED"
     RUN_FAILED = "RUN_FAILED"
 
@@ -104,7 +108,7 @@ class ModelConfig(BaseModel):
     provider: str = "openai"
     model: str = "gpt-4o-mini"
     temperature: float = 0.7
-    max_tokens: int = 4096
+    max_tokens: int = 16000
 
 
 class ToolPermission(BaseModel):

@@ -20,6 +20,11 @@ type VerifiedRunResult = {
   text?: string;
   verification?: { is_software?: boolean; passed?: boolean; issues?: Array<{ message?: string }> };
   files?: Array<{ path: string; content: string; language?: string }>;
+  agent_messages?: Array<{
+    id: string; from: string; to: string; subject: string;
+    body: string; reply: string; resolved: boolean;
+    created_at: string; resolved_at: string | null;
+  }>;
 };
 
 function verifiedCodeFiles(result: VerifiedRunResult | null): CodeBlock[] {
@@ -35,6 +40,8 @@ function updateAgentStatus(event: RuntimeEvent) {
   if (!event.agent_id) return;
   const store = useOrgStore.getState();
   if (event.category === 'TASK_STARTED' || event.category === 'AGENT_THINKING') store.setAgentStatus(event.agent_id, 'WORKING');
+  if (event.category === 'AGENT_BLOCKED') store.setAgentStatus(event.agent_id, 'WAITING');
+  if (event.category === 'AGENT_UNBLOCKED') store.setAgentStatus(event.agent_id, 'WORKING');
   if (event.category === 'TASK_COMPLETED') store.setAgentStatus(event.agent_id, 'COMPLETED');
   if (event.category === 'TASK_FAILED' || event.category === 'RUN_FAILED') store.setAgentStatus(event.agent_id, 'FAILED');
 }
@@ -461,6 +468,46 @@ function AgentTaskCard({ task, agent, agentsById, agentEvents }: AgentTaskCardPr
   );
 }
 
+// ── Agent Communications Panel ───────────────────────────────────
+
+type AgentMsg = NonNullable<VerifiedRunResult['agent_messages']>[number];
+
+function AgentCommsPanel({ messages }: { messages: AgentMsg[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!messages || messages.length === 0) return null;
+
+  return (
+    <div className="agent-comms-panel">
+      <button className="agent-comms-header" onClick={() => setExpanded(!expanded)} type="button">
+        <span className="agent-comms-icon">💬</span>
+        <span className="agent-comms-title">Agent Communications</span>
+        <span className="agent-comms-badge">{messages.length}</span>
+        <span className="agent-comms-chevron">{expanded ? '▲' : '▼'}</span>
+      </button>
+      {expanded && (
+        <div className="agent-comms-body">
+          {messages.map((m) => (
+            <div key={m.id} className="agent-comm-item">
+              <div className="agent-comm-meta">
+                <span className="comm-from">{m.from}</span>
+                <span className="comm-arrow">→</span>
+                <span className="comm-to">{m.to}</span>
+                <span className="comm-subject">{m.subject}</span>
+              </div>
+              <div className="agent-comm-question">{m.body}</div>
+              {m.reply && (
+                <div className="agent-comm-reply">
+                  <span className="comm-reply-label">{m.to}:</span> {m.reply}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ───────────────────────────────────────────────
 
 export function RunDashboard() {
@@ -618,6 +665,11 @@ export function RunDashboard() {
           <div className="run-warning">
             Advisory: {result.verification.issues.length} check(s) flagged — review the exported files before running.
           </div>
+        )}
+
+        {/* Agent Communications */}
+        {result?.agent_messages && result.agent_messages.length > 0 && (
+          <AgentCommsPanel messages={result.agent_messages} />
         )}
 
         {/* Full Codebase Export Card */}

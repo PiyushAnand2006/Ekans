@@ -156,6 +156,10 @@ export type EventCategory =
   | 'VERIFICATION_FAILED'
   | 'REPAIR_REQUESTED'
   | 'VERIFICATION_PASSED'
+  | 'AGENT_MESSAGE_SENT'
+  | 'AGENT_MESSAGE_REPLIED'
+  | 'AGENT_BLOCKED'
+  | 'AGENT_UNBLOCKED'
   | 'RUN_COMPLETED'
   | 'RUN_FAILED';
 
@@ -291,7 +295,7 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   provider: 'openai',
   model: 'gpt-4o-mini',
   temperature: 0.7,
-  max_tokens: 4096,
+  max_tokens: 16000,
 };
 
 export const DEFAULT_BUDGET: BudgetConfig = {
