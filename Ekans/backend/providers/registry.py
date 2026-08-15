@@ -9,17 +9,17 @@ import httpx
 from backend.providers.base import Completion, ModelProvider, ProviderError
 
 
-_REQUEST_LOCKS: dict[tuple[str, str, str], asyncio.Lock] = {}
+_REQUEST_SEMAPHORES: dict[tuple[str, str, str], asyncio.Semaphore] = {}
 
 
-def _lock_for(provider: str, api_key: str, base_url: str = "") -> asyncio.Lock:
+def _semaphore_for(provider: str, api_key: str, base_url: str = "") -> asyncio.Semaphore:
     normalized_provider = provider.lower().replace("_", "-")
     lock_key = (normalized_provider, api_key, base_url.rstrip("/"))
-    lock = _REQUEST_LOCKS.get(lock_key)
-    if lock is None:
-        lock = asyncio.Lock()
-        _REQUEST_LOCKS[lock_key] = lock
-    return lock
+    sem = _REQUEST_SEMAPHORES.get(lock_key)
+    if sem is None:
+        sem = asyncio.Semaphore(5)
+        _REQUEST_SEMAPHORES[lock_key] = sem
+    return sem
 
 
 async def _request_with_retry(make_request, provider_label: str) -> httpx.Response:
@@ -56,7 +56,7 @@ class OpenAICompatibleProvider(ModelProvider):
             headers["Authorization"] = f"Bearer {self.api_key}"
         try:
             async with httpx.AsyncClient(timeout=90) as client:
-                async with _lock_for("openai-compatible", self.api_key, self.base_url):
+                async with _semaphore_for("openai-compatible", self.api_key, self.base_url):
                     response = await _request_with_retry(
                         lambda: client.post(
                             f"{self.base_url}/chat/completions",
@@ -97,7 +97,7 @@ class AnthropicProvider(ModelProvider):
     async def complete(self, *, model: str, system: str, prompt: str, temperature: float, max_tokens: int) -> Completion:
         try:
             async with httpx.AsyncClient(timeout=90) as client:
-                async with _lock_for("anthropic", self.api_key):
+                async with _semaphore_for("anthropic", self.api_key):
                     response = await _request_with_retry(
                         lambda: client.post(
                             "https://api.anthropic.com/v1/messages",
@@ -125,7 +125,7 @@ class GeminiProvider(ModelProvider):
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
         try:
             async with httpx.AsyncClient(timeout=90) as client:
-                async with _lock_for("google", self.api_key, "https://generativelanguage.googleapis.com"):
+                async with _semaphore_for("google", self.api_key, "https://generativelanguage.googleapis.com"):
                     response = await _request_with_retry(
                         lambda: client.post(
                             url,

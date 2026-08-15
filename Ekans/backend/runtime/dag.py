@@ -124,6 +124,7 @@ class TaskDAG:
 
     def get_ready_tasks(self) -> list[str]:
         """Returns list of task IDs that are PENDING and whose dependencies are ALL COMPLETED."""
+        self.validate_dag()
         ready: list[str] = []
         for node_id, node in self.nodes.items():
             if node.status != TaskStatus.PENDING:

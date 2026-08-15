@@ -5,7 +5,7 @@
 
 import type { OrganizationDefinition, AgentDefinition, OrganizationRelationship, RunDefinition, RuntimeEvent } from '@/types/domain';
 
-const API_BASE = 'http://127.0.0.1:8001/api';
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 function formatValidationLocation(loc: unknown): string {
   if (!Array.isArray(loc) || loc.length === 0) return '';

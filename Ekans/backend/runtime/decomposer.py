@@ -215,6 +215,20 @@ Output Format:
             tasks.append(qa)
         elif scaffold.temp_id not in qa.dependencies:
             qa.dependencies.append(scaffold.temp_id)
+
+        # Sanitize inverted dependencies (e.g. architecture/planning tasks depending on downstream implementation)
+        foundational_re = re.compile(r"architect|strategy|requirement|system\s+design", re.I)
+        impl_re = re.compile(r"scaffold|integration|backend|frontend|qa|test|verify|deliverable|code|impl", re.I)
+        for task in tasks:
+            if foundational_re.search(f"{task.title} {task.required_capability}"):
+                task.dependencies = [
+                    dep for dep in task.dependencies
+                    if not any(
+                        other.temp_id == dep and impl_re.search(f"{other.title} {other.description}")
+                        for other in tasks
+                    )
+                ]
+
         return tasks
 
     def _parse_decomposition_json(

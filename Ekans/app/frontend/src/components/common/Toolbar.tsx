@@ -14,6 +14,7 @@ function ToolbarButton({ label, onClick, title, className }: { label: string; on
 export function Toolbar() {
   const openCreateDialog = useUiStore((s) => s.openCreateDialog);
   const toggleSettings = useUiStore((s) => s.toggleSettings);
+  const toggleLibrary = useUiStore((s) => s.toggleLibrary);
   const agents = useOrgStore((s) => s.agents);
   const setPositions = useOrgStore((s) => s.setPositions);
   const hasAnyKey = useSettingsStore((s) => s.hasAnyKey);
@@ -51,7 +52,9 @@ export function Toolbar() {
       </div>
       <div className="toolbar-center">
         <ToolbarButton label="+ Agent" onClick={() => openCreateDialog(null)} title="Add a new agent" />
-        <ToolbarButton label="⊞ Layout" onClick={handleAutoLayout} title="Auto-arrange nodes" />
+        <ToolbarButton label="Layout" onClick={handleAutoLayout} title="Auto-arrange nodes" />
+        <div className="toolbar-separator" />
+        <ToolbarButton label="Library" onClick={toggleLibrary} title="Save and load team configurations" />
         <div className="toolbar-separator" />
         <ToolbarButton label="↓ Export" onClick={() => exportFile()} title="Export organization as Obsidian vault (.md)" />
         <ToolbarButton label="↑ Import" onClick={() => fileInputRef.current?.click()} title="Import organization from vault (.md)" />
