@@ -596,21 +596,9 @@ class WorkforceOrchestrator:
                 for tid in ready_tasks
             ))
 
-        # ── Step 4: Advisory Verification ─────────────────────────────────
+        # ── Step 4: Advisory Verification & Deliverables ──────────────────
         verification = await self._verify_and_repair(lead_agent)
-        if not verification.files:
-            await self.finish(RunStatus.FAILED, {
-                "text": (
-                    "No exportable files were produced. The agents did not generate any code "
-                    "blocks with recognisable file paths. Try running again with a more specific objective."
-                ),
-                "verification": verification.to_dict(),
-                "files": [],
-                "agent_messages": self.messenger.all_messages(),
-            })
-            return
 
-        # ── Step 5: Manager Final Synthesis ───────────────────────────────
         completed_tasks = [
             t for t in self.task_defs_by_id.values()
             if t.status == TaskStatus.COMPLETED
@@ -624,6 +612,32 @@ class WorkforceOrchestrator:
             if text_out and not text_out.startswith("No provider response:"):
                 usable_outputs.append((f"{agent_name} ({t.title})", text_out))
 
+        # Only fail if neither exportable files NOR agent text outputs were produced
+        if not verification.files and not usable_outputs:
+            await self.finish(RunStatus.FAILED, {
+                "text": (
+                    "The organization could not obtain responses from the agents. "
+                    "Please check your provider API keys and network connection in Settings."
+                ),
+                "verification": verification.to_dict(),
+                "files": [],
+                "agent_messages": self.messenger.all_messages(),
+            })
+            return
+
+        # For non-technical / research tasks where agents produced text rather than code files,
+        # create a deliverable markdown file so it is also available as an exportable artifact
+        if not verification.files and usable_outputs:
+            from backend.runtime.project_verifier import GeneratedFile
+            combined_doc = "\n\n".join(f"## {title}\n\n{text}" for title, text in usable_outputs)
+            verification.files.append(GeneratedFile(
+                path="research-deliverable.md",
+                content=f"# {self.objective.strip()}\n\n{combined_doc}\n",
+                language="markdown",
+                synthesized=True,
+            ))
+
+        # ── Step 5: Manager Final Synthesis ───────────────────────────────
         await self.emit(
             EventCategory.AGENT_THINKING,
             f"{lead_agent.name} is synthesizing team output",
@@ -641,6 +655,10 @@ class WorkforceOrchestrator:
                 )
             )
 
+        md_files = [f for f in verification.files if f.path.endswith(('.md', '.txt', '.markdown', '.rst', '.csv'))]
+        is_document_project = bool(md_files) and len(verification.files) == len(md_files)
+
+        final_text = ""
         if usable_outputs:
             material = "\n\n".join(f"## {title}\n{text}" for title, text in usable_outputs)
             advisory_notes = ""
@@ -653,26 +671,54 @@ class WorkforceOrchestrator:
                     )
                     + ("\n- (and more...)" if len(verification.issues) > 8 else "")
                 )
-            final_prompt = (
-                f"### Objective Summary\n{self.objective}\n\n"
-                f"### Team Completed Deliverables\n{material}\n\n"
-                f"### Exported Files\n"
-                + "\n".join(f"- {file.path}" for file in verification.files)
-                + comm_summary
-                + advisory_notes
-                + "\n\n### Final Response Requirements\n"
-                "Act as the accountable manager. Summarise what was built, list the exported files, "
-                "and give clear instructions on how to run the project (install dependencies, start commands). "
-                "If agents communicated with each other during the run, briefly mention how they coordinated. "
-                "If there are advisory warnings, mention them as things to review. "
-                "Do not claim tests or runtime behaviour that was not verified."
-            )
-            final_text, _, _ = await self._complete(lead_agent, final_prompt)
-        else:
-            final_text = (
-                "The organization could not obtain model responses. "
-                "Configure a valid provider key and model in Settings, then run again."
-            )
+
+            if is_document_project:
+                final_prompt = (
+                    f"### Objective Summary\n{self.objective}\n\n"
+                    f"### Team Completed Deliverables\n{material}\n\n"
+                    f"### Generated Document Content\n"
+                    + (md_files[0].content if md_files else "")
+                    + comm_summary
+                    + "\n\n### Final Response Requirements\n"
+                    "Act as the lead presenter. Present the complete, detailed final deliverable / research document "
+                    "directly to the user in rich, comprehensive Markdown. Include all sections, data, links, and findings. "
+                    "Do not merely summarize or omit the document content; present the full report clearly."
+                )
+            else:
+                final_prompt = (
+                    f"### Objective Summary\n{self.objective}\n\n"
+                    f"### Team Completed Deliverables\n{material}\n\n"
+                    f"### Exported Files\n"
+                    + "\n".join(f"- {file.path}" for file in verification.files)
+                    + comm_summary
+                    + advisory_notes
+                    + "\n\n### Final Response Requirements\n"
+                    "Act as the accountable manager. Summarise what was built, list the exported files, "
+                    "and give clear instructions on how to run the project (install dependencies, start commands). "
+                    "If agents communicated with each other during the run, briefly mention how they coordinated. "
+                    "If there are advisory warnings, mention them as things to review. "
+                    "Do not claim tests or runtime behaviour that was not verified."
+                )
+            try:
+                completed_text, _, _ = await self._complete(lead_agent, final_prompt)
+                if completed_text and not completed_text.startswith("No provider response:"):
+                    final_text = completed_text
+            except Exception:
+                final_text = ""
+
+        # Robust Fallback: If synthesis was rate-limited (429), empty, or failed, fallback to deliverable files/outputs
+        if not final_text or final_text.startswith("No provider response:"):
+            if md_files:
+                # Deliverable research report or document directly presented to user
+                final_text = md_files[0].content
+            elif usable_outputs:
+                final_text = "\n\n---\n\n".join(f"### {title}\n{text}" for title, text in usable_outputs)
+            elif verification.files:
+                final_text = f"### Deliverable ({verification.files[0].path})\n\n```\n{verification.files[0].content}\n```"
+            else:
+                final_text = (
+                    "The organization completed execution. Please check the individual task outputs and exported files."
+                )
 
         await self.finish(RunStatus.COMPLETED, {
             "text": final_text,

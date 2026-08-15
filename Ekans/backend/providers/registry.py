@@ -23,21 +23,21 @@ def _semaphore_for(provider: str, api_key: str, base_url: str = "") -> asyncio.S
 
 
 async def _request_with_retry(make_request, provider_label: str) -> httpx.Response:
-    delay = 1.0
+    delay = 2.0
     response: httpx.Response | None = None
-    for attempt in range(3):
+    for attempt in range(4):
         response = await make_request()
         if response.status_code not in {429, 500, 502, 503, 504}:
             return response
-        if attempt == 2:
+        if attempt == 3:
             break
         retry_after = response.headers.get("Retry-After")
         try:
-            wait_seconds = float(retry_after) if retry_after else delay
+            wait_seconds = max(float(retry_after), 2.0) if retry_after else delay
         except ValueError:
             wait_seconds = delay
         await asyncio.sleep(wait_seconds)
-        delay = min(delay * 2, 8.0)
+        delay = min(delay * 2, 12.0)
     assert response is not None
     try:
         response.raise_for_status()

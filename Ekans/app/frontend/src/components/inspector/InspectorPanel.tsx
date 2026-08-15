@@ -54,23 +54,6 @@ export function InspectorPanel() {
     update({ model_config: { ...agent.model_config, provider, model: nextModel } });
   };
 
-  return (
-    <div className="inspector-panel">
-      <div className="inspector-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span className="inspector-badge" style={{ background: color }}>{agent.agent_type}</span>
-          <span className="inspector-title">{agent.name}</span>
-        </div>
-        <button className="btn btn-ghost btn-icon" onClick={closeInspector} title="Close inspector">x</button>
-      </div>
-      <div className="inspector-body inspector-body-atm">
-        <section className="inspector-section"><div className="inspector-section-title">Identity</div><label className="label">Name</label><input className="input" value={agent.name} onChange={(event) => update({ name: event.target.value })} /><label className="label">Role</label><input className="input" value={agent.role} onChange={(event) => update({ role: event.target.value })} /><label className="label">Agent type</label><select className="select" value={agent.agent_type} onChange={(event) => update({ agent_type: event.target.value as AgentType })}>{AGENT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></section>
-        <section className="inspector-section"><div className="inspector-section-title">Description</div><textarea className="textarea" value={agent.description} onChange={(event) => update({ description: event.target.value })} rows={3} /><label className="label">Goal</label><textarea className="textarea" value={agent.goal} onChange={(event) => update({ goal: event.target.value })} rows={3} /><label className="label">Instructions</label><textarea className="textarea" value={agent.instructions} onChange={(event) => update({ instructions: event.target.value })} rows={4} /></section>
-        <section className="inspector-section"><div className="inspector-section-title">Model configuration</div><label className="label">Provider</label><select className="select" value={agent.model_config.provider} onChange={(event) => updateProvider(event.target.value)}>{PROVIDERS.map((provider) => <option key={provider} value={provider}>{provider}</option>)}</select><label className="label">Model</label><input className="input" value={agent.model_config.model} onChange={(event) => update({ model_config: { ...agent.model_config, model: event.target.value } })} /><label className="label">API Key</label><input className="input" type="password" value={agent.api_key} onChange={(event) => update({ api_key: event.target.value })} placeholder="Agent-specific API key" spellCheck={false} autoComplete="off" /></section>
-        <section className="inspector-section"><button className="btn btn-danger" style={{ width: '100%' }} onClick={() => openDeleteDialog(agent.id)}>Delete agent</button></section>
-      </div>
-    </div>
-  );
 
   return (
     <div className="inspector-panel">

@@ -346,7 +346,7 @@ function formatTaskDuration(startedAt: string | null | undefined, completedAt: s
   return `${mins}m ${secs}s`;
 }
 
-// ── Agent Task Card ──────────────────────────────────────────────
+// ── Agent Task Card (Reference Design) ───────────────────────────
 
 function AgentTaskCard({ task, agent, agentsById, agentEvents }: {
   task: TaskDefinition;
@@ -354,103 +354,185 @@ function AgentTaskCard({ task, agent, agentsById, agentEvents }: {
   agentsById: Map<string, AgentDefinition>;
   agentEvents: RuntimeEvent[];
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const roleName = agent?.role || agent?.name || 'Software Specialist';
   const isComplete = task.status === 'COMPLETED';
-  const isRunning = task.status === 'RUNNING' || task.status === 'READY';
+  const isRunning = task.status === 'RUNNING' || task.status === 'READY' || task.status === 'ASSIGNED';
   const isFailed = task.status === 'FAILED';
+  const isPending = task.status === 'PENDING' || task.status === 'WAITING' || task.status === 'WAITING_APPROVAL';
 
-  // Subteam or department name (e.g. "Revenue team", "Delivery team", "Testing Team")
+  // Default running task to expanded, otherwise collapsed for clean overview list
+  const [expanded, setExpanded] = useState(isRunning);
+
+  const roleName = agent?.role || agent?.name || 'Software Specialist';
+  const roleLower = roleName.toLowerCase();
+  const isQA = roleLower.includes('qa') || roleLower.includes('test') || roleLower.includes('review');
+
+  // Subteam mapping matching reference design
   const parentAgent = agent?.reports_to ? agentsById.get(agent.reports_to) : null;
-  const isQA = roleName.toLowerCase().includes('qa') || roleName.toLowerCase().includes('test') || roleName.toLowerCase().includes('review');
   const subteam = isQA
     ? 'Testing Team'
-    : roleName.toLowerCase().includes('architect') || roleName.toLowerCase().includes('lead')
+    : roleLower.includes('architect') || roleLower.includes('lead')
     ? 'Revenue team'
-    : roleName.toLowerCase().includes('design') || roleName.toLowerCase().includes('marketing')
+    : roleLower.includes('design') || roleLower.includes('ui') || roleLower.includes('ux') || roleLower.includes('marketing')
     ? 'Marketing team'
     : parentAgent
     ? `${parentAgent.name} team`
     : 'Delivery team';
 
-  // Dot color matching reference image
-  const dotColor = isQA ? '#f0883e' : '#4a9eff';
+  const agentName = agent?.name || roleName;
+  const subtitle = subteam || agent?.description || 'Delivery team';
+
+  // Delegated by determination
+  const requesterAgent = task.requested_by_agent_id ? agentsById.get(task.requested_by_agent_id) : null;
+  const delegatedBy = requesterAgent?.name || parentAgent?.name || (agent?.agent_type === 'MANAGER' ? 'Orchestrator' : 'Manager');
+
+  const taskName = task.title || task.description || 'System Architecture Design';
+  const depCount = task.dependencies?.length || 0;
+  const dependsOnStr = `${depCount} task(s)`;
+
+  // Dot color matching reference image (blue for builders, orange for QA)
+  const dotColor = isFailed ? '#f87171' : isQA ? '#f0883e' : '#4a9eff';
 
   const totalTokens = (task.cost?.input_tokens || 0) + (task.cost?.output_tokens || 0);
   const tokenString = totalTokens > 0 ? `${formatTokens(totalTokens)} tok` : isComplete ? '4.8K tok' : '—';
   const durationString = formatTaskDuration(task.started_at, task.completed_at);
 
+  const inputTokens = task.cost?.input_tokens ?? 0;
+  const outputTokens = task.cost?.output_tokens ?? 0;
+  const estCost = task.cost?.estimated_cost ?? 0;
+
   const outputText = typeof task.result === 'object' && task.result !== null ? (task.result as any).text : null;
-  const dependencies = (task.dependencies || [])
-    .map((depId) => agentsById.get(depId)?.name || depId)
-    .filter(Boolean);
+
+  // Build activity events
+  const displayEvents = agentEvents.length > 0
+    ? agentEvents
+    : [
+        {
+          id: `initial-${task.id}`,
+          category: 'TASK_CREATED',
+          message: `Delegated '${taskName}' to ${agentName}`,
+          timestamp: task.created_at || new Date().toISOString(),
+        } as RuntimeEvent,
+      ];
 
   return (
-    <div className={`agent-row-card ${task.status.toLowerCase()}`}>
-      <div className="agent-row-header" onClick={() => setExpanded(!expanded)}>
-        <div className="agent-row-left">
-          <span className={`agent-row-chevron${expanded ? ' is-expanded' : ''}`}>
+    <div className={`agent-card-container ${task.status.toLowerCase()}`}>
+      {/* Header */}
+      <div className="agent-card-header" onClick={() => setExpanded(!expanded)}>
+        <div className="agent-card-header-left">
+          <span className={`agent-card-chevron ${expanded ? 'is-expanded' : 'is-collapsed'}`}>
             <ChevronRightIcon />
           </span>
-          <span className="agent-row-dot" style={{ background: dotColor }} />
-          <div className="agent-row-identity">
-            <span className="agent-row-role">{roleName}</span>
-            <span className="agent-row-subteam">{subteam}</span>
+          <span
+            className="agent-card-dot"
+            style={{
+              background: dotColor,
+              boxShadow: isRunning ? `0 0 10px ${dotColor}` : `0 0 5px ${dotColor}66`,
+            }}
+          />
+          <div className="agent-card-titles">
+            <span className="agent-card-title">{agentName}</span>
+            <span className="agent-card-subtitle">{subtitle}</span>
           </div>
         </div>
 
-        <div className="agent-row-right">
-          <span className={`agent-row-status ${task.status.toLowerCase()}`}>
+        <div className="agent-card-header-right">
+          <span className={`agent-card-badge ${task.status.toLowerCase()}`}>
             {isRunning && <span className="chat-status-pulse" />}
             {task.status}
           </span>
-          <span className="agent-row-tokens">{tokenString}</span>
-          <span className="agent-row-duration">{durationString}</span>
+          <span className="agent-card-tokens">{tokenString}</span>
+          <span className="agent-card-duration">{durationString}</span>
+          {expanded && (
+            <button
+              type="button"
+              className="agent-card-minimize-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded(false);
+              }}
+              title="Collapse"
+            >
+              —
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Expanded Body */}
       {expanded && (
-        <div className="agent-row-body">
-          {task.description && (
-            <div className="agent-task-detail-section">
-              <span className="agent-task-detail-label">Task Description</span>
-              <p className="agent-task-detail-text">{task.description}</p>
-            </div>
-          )}
-
-          {dependencies.length > 0 && (
-            <div className="agent-task-detail-section">
-              <span className="agent-task-detail-label">Prerequisites</span>
-              <div className="agent-task-deps">
-                {dependencies.map((dep, idx) => (
-                  <span key={idx} className="agent-task-dep-pill">{dep}</span>
-                ))}
+        <div className="agent-card-body">
+          {/* 1. Context Routing */}
+          <div className="agent-card-section">
+            <div className="agent-card-section-title">Context Routing</div>
+            <div className="agent-context-grid">
+              <div className="agent-context-cell">
+                <span className="agent-context-label">ASSIGNED TO</span>
+                <span className="agent-context-value">{agentName}</span>
+              </div>
+              <div className="agent-context-cell">
+                <span className="agent-context-label">DELEGATED BY</span>
+                <span className="agent-context-value">{delegatedBy}</span>
+              </div>
+              <div className="agent-context-cell">
+                <span className="agent-context-label">TASK</span>
+                <span className="agent-context-value">{taskName}</span>
+              </div>
+              <div className="agent-context-cell">
+                <span className="agent-context-label">DEPENDS ON</span>
+                <span className="agent-context-value">{dependsOnStr}</span>
               </div>
             </div>
-          )}
+          </div>
 
-          {outputText && (
-            <div className="agent-task-detail-section">
-              <span className="agent-task-detail-label">Deliverable Output</span>
-              <div className="agent-task-output-box">
+          {/* 2. Cost & Token Usage */}
+          <div className="agent-card-section">
+            <div className="agent-card-section-title">Cost & Token Usage</div>
+            <div className="agent-cost-grid">
+              <div className="agent-cost-cell">
+                <span className="agent-cost-val">{inputTokens}</span>
+                <span className="agent-cost-lbl">INPUT TOKENS</span>
+              </div>
+              <div className="agent-cost-cell">
+                <span className="agent-cost-val">{outputTokens}</span>
+                <span className="agent-cost-lbl">OUTPUT TOKENS</span>
+              </div>
+              <div className="agent-cost-cell">
+                <span className="agent-cost-val">${estCost.toFixed(4)}</span>
+                <span className="agent-cost-lbl">EST. COST</span>
+              </div>
+              <div className="agent-cost-cell">
+                <span className="agent-cost-val">{durationString}</span>
+                <span className="agent-cost-lbl">DURATION</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Activity Events */}
+          <div className="agent-card-section">
+            <div className="agent-card-section-title">Activity ({displayEvents.length} Events)</div>
+            <div className="agent-activity-list">
+              {displayEvents.map((ev) => (
+                <div key={ev.id} className="agent-activity-row">
+                  <span className="agent-activity-tag">
+                    {ev.category.replace(/_/g, ' ')}
+                  </span>
+                  <span className="agent-activity-msg">{ev.message}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 4. Output */}
+          <div className="agent-card-section">
+            <div className="agent-card-section-title">Output</div>
+            <div className="agent-output-box">
+              {outputText ? (
                 <MarkdownRenderer content={outputText} />
-              </div>
+              ) : (
+                <div className="agent-output-empty">No response available.</div>
+              )}
             </div>
-          )}
-
-          {agentEvents.length > 0 && (
-            <div className="agent-task-detail-section">
-              <span className="agent-task-detail-label">Activity Log ({agentEvents.length})</span>
-              <div className="agent-task-logs">
-                {agentEvents.map((ev) => (
-                  <div key={ev.id} className="agent-task-log-entry">
-                    <span className="agent-task-log-cat">{ev.category.replace(/_/g, ' ')}</span>
-                    <span className="agent-task-log-msg">{ev.message}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       )}
     </div>
@@ -582,15 +664,44 @@ function ChatTurnView({ turn, agentsById }: {
           </div>
         )}
 
-        {/* Final Response Text */}
-        {result?.text && (
-          <article className="run-result" style={{ marginTop: 12 }}>
-            <MarkdownRenderer content={result.text} />
-            {codeFiles.length === 0 && !result.verification?.is_software && (
-              <SaveCodeButton content={result.text} />
-            )}
-          </article>
-        )}
+        {/* Final Response Text & Deliverables */}
+        {(() => {
+          let mainText = result?.text || '';
+          const isErrorText = mainText.startsWith('No provider response:');
+
+          // Fallback: If manager synthesis was rate-limited (429) or empty, extract from generated document files or task outputs!
+          if (isErrorText || !mainText.trim()) {
+            const mdDoc = codeFiles.find((f) => f.filename.endsWith('.md') || f.filename.endsWith('.txt')) || codeFiles[0];
+            if (mdDoc) {
+              mainText = mdDoc.content;
+            } else if (tasks.length > 0) {
+              const taskOutputs = tasks
+                .map((t) => typeof t.result === 'object' && t.result !== null ? (t.result as any).text : null)
+                .filter((t) => t && !t.startsWith('No provider response:'));
+              if (taskOutputs.length > 0) {
+                mainText = taskOutputs.join('\n\n---\n\n');
+              }
+            }
+          }
+
+          if (!mainText && codeFiles.length === 0) return null;
+
+          return (
+            <article className="run-result" style={{ marginTop: 12 }}>
+              {isErrorText && (
+                <div className="run-warning" style={{ marginBottom: 10, fontSize: 12 }}>
+                  Synthesis Notice: Provider rate limited (429) during summary. Displaying generated deliverable content directly below.
+                </div>
+              )}
+              {mainText ? (
+                <MarkdownRenderer content={mainText} />
+              ) : null}
+              {codeFiles.length === 0 && !result?.verification?.is_software && mainText && (
+                <SaveCodeButton content={mainText} />
+              )}
+            </article>
+          );
+        })()}
 
         {/* Advisory verification issues */}
         {result?.verification?.issues && result.verification.issues.length > 0 && (
