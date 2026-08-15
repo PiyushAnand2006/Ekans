@@ -459,49 +459,113 @@ body {
   border-top: 1px solid var(--border-subtle);
 }
 
-/* Templates Grid */
+/* Create Agent Dialog & Templates Grid */
+.create-agent-dialog {
+  width: 640px !important;
+  max-width: 94vw !important;
+}
+
 .templates-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .template-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 14px 8px;
-  border: 2px solid var(--border-default);
-  border-radius: 10px;
-  background: var(--bg-surface);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: #111827;
   cursor: pointer;
-  transition: all var(--transition-fast);
-  text-align: center;
+  overflow: hidden;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .template-card:hover {
-  border-color: var(--border-hover);
-  background: var(--bg-elevated);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  border-color: rgba(96, 165, 250, 0.5);
+  background: #162032;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 15px rgba(59, 130, 246, 0.2);
 }
 
 .template-card.selected {
   border-color: var(--accent-blue);
-  background: rgba(74, 158, 255, 0.08);
-  box-shadow: var(--shadow-glow-blue);
+  background: #162238;
+  box-shadow: 0 0 0 1px var(--accent-blue), 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(59, 130, 246, 0.35);
+  transform: translateY(-2px);
 }
 
-.template-icon {
-  font-size: 28px;
+.template-poster-wrapper {
+  position: relative;
+  width: 100%;
+  height: 85px;
+  background: #0b0f19;
+  overflow: hidden;
+}
+
+.template-poster-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.template-card:hover .template-poster-svg {
+  transform: scale(1.05);
+}
+
+.template-poster-type {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(10, 15, 29, 0.85);
+  backdrop-filter: blur(4px);
+  border: 1px solid;
+}
+
+.template-info {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .template-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  color: #f1f5f9;
+  letter-spacing: -0.2px;
+}
+
+.template-desc {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.template-selected-badge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  font-size: 0;
 }
 
 /* Context Menu */
