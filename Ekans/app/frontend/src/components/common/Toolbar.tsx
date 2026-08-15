@@ -112,7 +112,7 @@ export function Toolbar() {
         </button>
         {lastSaved && (
           <span className="toolbar-saved-indicator" title={`Last saved: ${lastSaved}`}>
-            ✓ Saved
+            Saved
           </span>
         )}
         <span className="toolbar-count">{agents.size} agents</span>

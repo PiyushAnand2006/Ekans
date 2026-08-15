@@ -33,7 +33,6 @@ export function InspectorPanel() {
     return (
       <div className="inspector-panel">
         <div className="inspector-empty">
-          <div className="inspector-empty-icon">🎯</div>
           <div>Select an agent to inspect</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             Click a node on the canvas, or double-click empty space to create one.
@@ -66,7 +65,7 @@ export function InspectorPanel() {
           <span className="inspector-title">{agent.name}</span>
         </div>
         <button className="btn btn-ghost btn-icon" onClick={closeInspector} title="Close inspector">
-          ✕
+          x
         </button>
       </div>
 
@@ -74,7 +73,7 @@ export function InspectorPanel() {
       <div className="inspector-body">
         {/* Identity */}
         <div className="inspector-section">
-          <div className="inspector-section-title">🏷️ Identity</div>
+          <div className="inspector-section-title">Identity</div>
           <div className="form-group">
             <label className="label">Name</label>
             <input
@@ -121,7 +120,7 @@ export function InspectorPanel() {
 
         {/* Purpose */}
         <div className="inspector-section">
-          <div className="inspector-section-title">🎯 Purpose</div>
+          <div className="inspector-section-title">Purpose</div>
           <div className="form-group">
             <label className="label">Description</label>
             <textarea
@@ -156,7 +155,7 @@ export function InspectorPanel() {
 
         {/* Responsibilities */}
         <div className="inspector-section">
-          <div className="inspector-section-title">📋 Responsibilities</div>
+          <div className="inspector-section-title">Responsibilities</div>
           <div className="list-editor">
             {agent.responsibilities.map((resp, i) => (
               <div key={i} className="list-editor-item">
@@ -175,7 +174,7 @@ export function InspectorPanel() {
                     const newResp = agent.responsibilities.filter((_, j) => j !== i);
                     update({ responsibilities: newResp });
                   }}
-                >✕</button>
+                >x</button>
               </div>
             ))}
             <button
@@ -189,7 +188,7 @@ export function InspectorPanel() {
 
         {/* Model Configuration */}
         <div className="inspector-section">
-          <div className="inspector-section-title">🧠 Model</div>
+          <div className="inspector-section-title">Model</div>
           <div className="form-group">
             <label className="label">Provider</label>
             <select
@@ -252,7 +251,7 @@ export function InspectorPanel() {
 
         {/* Tools */}
         <div className="inspector-section">
-          <div className="inspector-section-title">🔧 Tools</div>
+          <div className="inspector-section-title">Tools</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {AVAILABLE_TOOLS.map((tool) => {
               const isEnabled = agent.tools.includes(tool);
@@ -275,7 +274,7 @@ export function InspectorPanel() {
                     }
                   }}
                 >
-                  {isEnabled ? '✓ ' : ''}{tool}
+                  {isEnabled ? '[x] ' : ''}{tool}
                 </button>
               );
             })}
@@ -284,7 +283,7 @@ export function InspectorPanel() {
 
         {/* Budget */}
         <div className="inspector-section">
-          <div className="inspector-section-title">💰 Budget</div>
+          <div className="inspector-section-title">Budget</div>
           <div style={{ display: 'flex', gap: 10 }}>
             <div className="form-group" style={{ flex: 1 }}>
               <label className="label">Max Cost</label>
@@ -315,7 +314,7 @@ export function InspectorPanel() {
             style={{ width: '100%' }}
             onClick={() => openDeleteDialog(agent.id)}
           >
-            🗑️ Delete Agent
+            Delete Agent
           </button>
         </div>
       </div>

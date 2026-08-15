@@ -62,7 +62,7 @@ export function SaveTeamDialog() {
         <div className="dialog-header">
           <div className="dialog-title">Save Team</div>
           <button className="btn btn-ghost btn-icon" onClick={closeDialog} title="Close">
-            ✕
+            x
           </button>
         </div>
 

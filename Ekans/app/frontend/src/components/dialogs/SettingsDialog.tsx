@@ -8,25 +8,25 @@ const PROVIDER_INFO: Record<string, { label: string; placeholder: string; icon: 
   openai: {
     label: 'OpenAI',
     placeholder: 'sk-...',
-    icon: '🟢',
+    icon: '',
     helpUrl: 'https://platform.openai.com/api-keys',
   },
   anthropic: {
     label: 'Anthropic',
     placeholder: 'sk-ant-...',
-    icon: '🟣',
+    icon: '',
     helpUrl: 'https://console.anthropic.com/settings/keys',
   },
   google: {
     label: 'Google AI',
     placeholder: 'AIza...',
-    icon: '🔵',
+    icon: '',
     helpUrl: 'https://aistudio.google.com/apikey',
   },
   openrouter: {
     label: 'OpenRouter',
     placeholder: 'sk-or-v1-...',
-    icon: '🟠',
+    icon: '',
     helpUrl: 'https://openrouter.ai/keys',
   },
 };
@@ -56,10 +56,9 @@ export function SettingsDialog() {
         {/* Header */}
         <div className="settings-header">
           <div className="settings-header-title">
-            <span className="settings-icon">⚙️</span>
             <span>Settings</span>
           </div>
-          <button className="btn btn-ghost btn-icon" onClick={toggleSettings}>✕</button>
+          <button className="btn btn-ghost btn-icon" onClick={toggleSettings}>x</button>
         </div>
 
         {/* Tabs */}
@@ -68,19 +67,19 @@ export function SettingsDialog() {
             className={`settings-tab ${tab === 'keys' ? 'active' : ''}`}
             onClick={() => setTab('keys')}
           >
-            🔑 API Keys
+            API Keys
           </button>
           <button
             className={`settings-tab ${tab === 'defaults' ? 'active' : ''}`}
             onClick={() => setTab('defaults')}
           >
-            🎛️ Defaults
+            Defaults
           </button>
           <button
             className={`settings-tab ${tab === 'about' ? 'active' : ''}`}
             onClick={() => setTab('about')}
           >
-            ℹ️ About
+            About
           </button>
         </div>
 
@@ -113,7 +112,6 @@ function ApiKeysTab() {
   return (
     <div className="settings-tab-content">
       <div className="settings-info-banner">
-        <span className="settings-info-icon">🔒</span>
         <span>API keys are stored locally in your browser. They are never sent to any server except the respective LLM provider.</span>
       </div>
 
@@ -124,7 +122,6 @@ function ApiKeysTab() {
           <div key={key} className="settings-key-group">
             <div className="settings-key-header">
               <div className="settings-key-label">
-                <span>{info.icon}</span>
                 <span>{info.label}</span>
                 <span className={`settings-status-dot ${provider.configured ? 'configured' : 'not-configured'}`} />
                 <span className="settings-status-text">
@@ -137,7 +134,7 @@ function ApiKeysTab() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Get key ↗
+                Get key
               </a>
             </div>
             <div className="settings-key-input-row">
@@ -156,7 +153,7 @@ function ApiKeysTab() {
                   onClick={() => toggleVisible(key)}
                   title={visibleKeys[key] ? 'Hide key' : 'Show key'}
                 >
-                  {visibleKeys[key] ? '🙈' : '👁️'}
+                  {visibleKeys[key] ? 'Hide' : 'Show'}
                 </button>
               </div>
               {provider.configured && (
@@ -176,7 +173,6 @@ function ApiKeysTab() {
       <div className="settings-key-group">
         <div className="settings-key-header">
           <div className="settings-key-label">
-            <span>🦙</span>
             <span>Ollama (Local)</span>
             <span className={`settings-status-dot ${providers.ollama.configured ? 'configured' : 'not-configured'}`} />
             <span className="settings-status-text">
@@ -189,7 +185,7 @@ function ApiKeysTab() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Download Ollama ↗
+            Download Ollama
           </a>
         </div>
         <div className="settings-key-input-row">
@@ -215,7 +211,6 @@ function ApiKeysTab() {
       <div className="settings-key-group">
         <div className="settings-key-header">
           <div className="settings-key-label">
-            <span>🔌</span>
             <span>OpenAI-Compatible API</span>
             <span className={`settings-status-dot ${providers['openai-compatible'].configured ? 'configured' : 'not-configured'}`} />
             <span className="settings-status-text">
@@ -246,7 +241,7 @@ function ApiKeysTab() {
               onClick={() => toggleVisible('openai-compatible')}
               title={visibleKeys['openai-compatible'] ? 'Hide key' : 'Show key'}
             >
-              {visibleKeys['openai-compatible'] ? '🙈' : '👁️'}
+              {visibleKeys['openai-compatible'] ? 'Hide' : 'Show'}
             </button>
           </div>
         </div>
@@ -256,7 +251,6 @@ function ApiKeysTab() {
       <div className="settings-key-group">
         <div className="settings-key-header">
           <div className="settings-key-label">
-            <span>🟠</span>
             <span>OpenRouter</span>
             <span className={`settings-status-dot ${providers.openrouter.configured ? 'configured' : 'not-configured'}`} />
             <span className="settings-status-text">
@@ -269,7 +263,7 @@ function ApiKeysTab() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Get key ↗
+            Get key
           </a>
         </div>
         <div className="settings-key-input-row">
@@ -288,7 +282,7 @@ function ApiKeysTab() {
               onClick={() => toggleVisible('openrouter')}
               title={visibleKeys.openrouter ? 'Hide key' : 'Show key'}
             >
-              {visibleKeys.openrouter ? '🙈' : '👁️'}
+              {visibleKeys.openrouter ? 'Hide' : 'Show'}
             </button>
           </div>
           {providers.openrouter.configured && (
@@ -317,7 +311,6 @@ function DefaultsTab() {
   return (
     <div className="settings-tab-content">
       <div className="settings-info-banner">
-        <span className="settings-info-icon">💡</span>
         <span>These defaults are applied when creating new agents. You can override them per-agent in the inspector.</span>
       </div>
 
@@ -332,7 +325,7 @@ function DefaultsTab() {
         >
           {providerOptions.map((p) => (
             <option key={p} value={p}>
-              {p} {activeProviders.includes(p) ? '✓' : '(not configured)'}
+              {p} {activeProviders.includes(p) ? '[configured]' : '(not configured)'}
             </option>
           ))}
         </select>
@@ -422,7 +415,6 @@ function AboutTab() {
   return (
     <div className="settings-tab-content">
       <div className="settings-about">
-        <div className="settings-about-logo">🐍</div>
         <h2 className="settings-about-name">Ekans</h2>
         <p className="settings-about-tagline">AI Workforce Builder</p>
         <p className="settings-about-version">v0.1.0</p>
@@ -435,15 +427,12 @@ function AboutTab() {
         </div>
         <div className="settings-about-credits">
           <div className="settings-about-credit-item">
-            <span>🏗️</span>
             <span>Built with React, TypeScript, React Flow, Zustand</span>
           </div>
           <div className="settings-about-credit-item">
-            <span>📝</span>
             <span>Obsidian-style vault memory system</span>
           </div>
           <div className="settings-about-credit-item">
-            <span>🤖</span>
             <span>Multi-provider LLM support (OpenAI, Anthropic, Google, OpenRouter, Ollama)</span>
           </div>
         </div>

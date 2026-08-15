@@ -267,12 +267,12 @@ function escYaml(s: string): string {
 
 function getAgentIcon(type: string): string {
   switch (type) {
-    case 'MANAGER': return '👔';
-    case 'SPECIALIST': return '⚡';
-    case 'REVIEWER': return '🔍';
-    case 'HUMAN': return '👤';
-    case 'CUSTOM': return '🔮';
-    default: return '🤖';
+    case 'MANAGER': return '';
+    case 'SPECIALIST': return '';
+    case 'REVIEWER': return '';
+    case 'HUMAN': return '';
+    case 'CUSTOM': return '';
+    default: return '';
   }
 }
 

@@ -14,11 +14,11 @@ const TYPE_COLORS: Record<AgentType, string> = {
 };
 
 const TYPE_ICONS: Record<AgentType, string> = {
-  MANAGER: '👔',
-  SPECIALIST: '⚡',
-  REVIEWER: '🔍',
-  HUMAN: '👤',
-  CUSTOM: '🔧',
+  MANAGER: '',
+  SPECIALIST: '',
+  REVIEWER: '',
+  HUMAN: '',
+  CUSTOM: '',
 };
 
 const STATUS_LABELS: Record<AgentStatus, string> = {
@@ -42,7 +42,7 @@ function AgentNodeInner({ data, selected }: NodeProps) {
   const [hovered, setHovered] = useState(false);
   const agent = data.agent as AgentDefinition;
   const color = agent.color || TYPE_COLORS[agent.agent_type] || '#4a9eff';
-  const icon = TYPE_ICONS[agent.agent_type] || '🤖';
+  const icon = TYPE_ICONS[agent.agent_type] || '';
   const status = useOrgStore((s) => s.agentStatuses.get(agent.id)) as AgentStatus | undefined;
   const childCount = useOrgStore((s) => {
     let count = 0;
@@ -183,7 +183,7 @@ function AgentNodeInner({ data, selected }: NodeProps) {
             onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(120,120,120,0.6)'; e.currentTarget.style.color = '#ddd'; }}
             title="Delete agent"
           >
-            ✕
+            x
           </button>
 
           {/* Add child button */}

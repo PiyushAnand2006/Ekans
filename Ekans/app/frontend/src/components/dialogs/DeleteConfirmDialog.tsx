@@ -39,7 +39,7 @@ export function DeleteConfirmDialog() {
       <div className="dialog" onClick={(e) => e.stopPropagation()} style={{ width: 400 }}>
         <div className="dialog-header">
           <div className="dialog-title">Delete Agent</div>
-          <button className="btn btn-ghost btn-icon" onClick={closeDialog}>✕</button>
+          <button className="btn btn-ghost btn-icon" onClick={closeDialog}>x</button>
         </div>
         <div className="dialog-body">
           <p style={{ marginBottom: 12 }}>
@@ -51,7 +51,7 @@ export function DeleteConfirmDialog() {
               background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
               fontSize: 13, color: 'var(--accent-red)',
             }}>
-              ⚠️ This will also delete {descendantCount} subordinate agent{descendantCount > 1 ? 's' : ''}.
+              Warning: This will also delete {descendantCount} subordinate agent{descendantCount > 1 ? 's' : ''}.
             </div>
           )}
         </div>
@@ -60,7 +60,7 @@ export function DeleteConfirmDialog() {
           <button className="btn btn-danger" onClick={handleDelete} style={{
             background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)',
           }}>
-            🗑️ Delete{descendantCount > 0 ? ` (${descendantCount + 1})` : ''}
+            Delete{descendantCount > 0 ? ` (${descendantCount + 1})` : ''}
           </button>
         </div>
       </div>

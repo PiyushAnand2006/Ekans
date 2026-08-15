@@ -556,7 +556,7 @@ function AgentCommsPanel({ messages }: { messages: NonNullable<VerifiedRunResult
           {messages.map((m) => (
             <div key={m.id} className="agent-comm-item">
               <div className="agent-comm-route">
-                <strong>{m.from}</strong> ➔ <strong>{m.to}</strong>: {m.subject}
+                <strong>{m.from}</strong> -&gt; <strong>{m.to}</strong>: {m.subject}
               </div>
               <p className="agent-comm-question">{m.body}</p>
               {m.reply && <p className="agent-comm-reply"><strong>Reply:</strong> {m.reply}</p>}

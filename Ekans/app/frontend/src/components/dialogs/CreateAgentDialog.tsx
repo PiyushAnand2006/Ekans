@@ -34,7 +34,7 @@ export function CreateAgentDialog() {
         responsibilities: [],
         tools: [],
         color: customType === 'MANAGER' ? '#4a9eff' : customType === 'REVIEWER' ? '#10b981' : '#f59e0b',
-        icon: '🤖',
+        icon: '',
       };
       addAgent(template, parentId ?? null);
       toast(`Created ${customName.trim()}`, 'success');
@@ -59,7 +59,7 @@ export function CreateAgentDialog() {
           <div className="dialog-title">
             {parentAgent ? `Add subordinate to ${parentAgent.name}` : 'Add Agent'}
           </div>
-          <button className="btn btn-ghost btn-icon" onClick={handleClose}>✕</button>
+          <button className="btn btn-ghost btn-icon" onClick={handleClose}>x</button>
         </div>
 
         <div className="dialog-body">

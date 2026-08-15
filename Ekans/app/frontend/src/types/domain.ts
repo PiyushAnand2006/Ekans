@@ -219,7 +219,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     responsibilities: ['Decompose objectives into tasks', 'Delegate to specialists', 'Review results', 'Synthesize final output'],
     tools: [],
     color: '#4a9eff',
-    icon: '👔',
+    icon: '',
   },
   {
     name: 'Researcher',
@@ -230,7 +230,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     responsibilities: ['Research topics', 'Gather data', 'Analyze findings', 'Summarize results'],
     tools: ['web_search', 'http'],
     color: '#8b5cf6',
-    icon: '🔬',
+    icon: '',
   },
   {
     name: 'Writer',
@@ -241,7 +241,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     responsibilities: ['Write content', 'Edit drafts', 'Format documents', 'Create reports'],
     tools: ['filesystem'],
     color: '#f59e0b',
-    icon: '✍️',
+    icon: '',
   },
   {
     name: 'Developer',
@@ -252,7 +252,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     responsibilities: ['Write code', 'Implement features', 'Fix bugs', 'Refactor'],
     tools: ['filesystem', 'terminal', 'git'],
     color: '#10b981',
-    icon: '💻',
+    icon: '',
   },
   {
     name: 'Analyst',
@@ -263,7 +263,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     responsibilities: ['Analyze data', 'Identify patterns', 'Create visualizations', 'Provide recommendations'],
     tools: ['web_search'],
     color: '#06b6d4',
-    icon: '📊',
+    icon: '',
   },
   {
     name: 'Reviewer',
@@ -274,7 +274,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     responsibilities: ['Review output', 'Check quality', 'Provide feedback', 'Approve deliverables'],
     tools: [],
     color: '#ef4444',
-    icon: '🔍',
+    icon: '',
   },
   {
     name: 'Marketing',
@@ -285,7 +285,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     responsibilities: ['Create strategies', 'Write copy', 'Plan campaigns', 'Analyze performance'],
     tools: ['web_search'],
     color: '#ec4899',
-    icon: '📢',
+    icon: '',
   },
 ];
 

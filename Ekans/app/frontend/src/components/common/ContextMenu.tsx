@@ -42,16 +42,16 @@ export function ContextMenu() {
 
   const items = [
     {
-      label: '⚙️ Inspect',
+      label: 'Inspect',
       action: () => { selectAgent(agent.id); openInspector(); closeContextMenu(); },
     },
     {
-      label: '➕ Add Subordinate',
+      label: 'Add Subordinate',
       action: () => { openCreateDialog(agent.id); closeContextMenu(); },
     },
     { separator: true },
     {
-      label: '🗑️ Delete',
+      label: 'Delete',
       action: () => { openDeleteDialog(agent.id); closeContextMenu(); },
       danger: true,
     },

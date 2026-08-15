@@ -22,7 +22,7 @@ export function SearchBar() {
             onClick={() => setSearchQuery('')}
             title="Clear search"
           >
-            ✕
+            x
           </button>
         )}
       </div>
