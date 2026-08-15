@@ -5,12 +5,22 @@
 /* Canvas panel needs to fill available space for React Flow */
 .canvas-panel {
   flex: 1;
+  height: 100%;
+  width: 100%;
   position: relative;
   overflow: hidden;
 }
 
-/* React Flow needs 100% height */
-.canvas-panel .react-flow {
+.canvas-panel > .canvas-panel {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
 }
+
+/* React Flow needs 100% height */
+.canvas-panel .react-flow {
+  width: 100% !important;
+  height: 100% !important;
+}
+

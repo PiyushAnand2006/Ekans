@@ -568,12 +568,6 @@ class WorkforceOrchestrator:
                 real_task_id,
             )
 
-        # Validate DAG to resolve any cyclic dependencies emitted by LLM planner
-        task_dag.validate_dag()
-        for task_id, node in task_dag.nodes.items():
-            if task_id in self.task_defs_by_id:
-                self.task_defs_by_id[task_id].dependencies = list(node.dependencies)
-
         # ── Step 3: Execute Waves with Peer Communication ──────────────────
         # Re-evaluate readiness after every batch. Unlike precomputed waves,
         # this includes tasks injected by agents while the run is in progress.

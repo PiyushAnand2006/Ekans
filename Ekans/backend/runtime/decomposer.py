@@ -15,6 +15,23 @@ SOFTWARE_OBJECTIVE = re.compile(
     re.IGNORECASE,
 )
 
+SOFTWARE_BUILD_KEYWORDS = re.compile(
+    r"\b(build|create|implement|generate|develop|write|scaffold|code|make|add|fix|refactor|update)\b",
+    re.IGNORECASE,
+)
+
+INFORMATIONAL_KEYWORDS = re.compile(
+    r"^\s*(describe|explain|what|why|how\s+does|how\s+is|tell\s+me|summarize|list|show\s+me|analyze|overview)\b",
+    re.IGNORECASE,
+)
+
+
+def is_software_build_objective(objective: str) -> bool:
+    """Return True only if the objective asks to build/generate/modify software."""
+    if INFORMATIONAL_KEYWORDS.search(objective):
+        return False
+    return bool(SOFTWARE_OBJECTIVE.search(objective) and SOFTWARE_BUILD_KEYWORDS.search(objective))
+
 
 class DecomposedTask(BaseModel):
     temp_id: str = Field(description="Temporary ID like 'task_1', 'task_2'")

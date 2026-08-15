@@ -1,13 +1,15 @@
 import { useUiStore } from '@/store/ui-store';
+import { useLibraryStore } from '@/store/library-store';
 
 export function SearchBar() {
   const searchQuery = useUiStore((s) => s.searchQuery);
   const setSearchQuery = useUiStore((s) => s.setSearchQuery);
+  const openSaveTeamDialog = useUiStore((s) => s.openSaveTeamDialog);
+  const activeTeamName = useLibraryStore((s) => s.activeTeamName);
 
   return (
-    <div className="search-bar">
-      <div style={{ position: 'relative' }}>
-        <span className="search-icon">🔍</span>
+    <div className="search-bar search-bar-atm">
+      <div className="search-input-wrapper">
         <input
           className="search-input"
           placeholder="Search agents..."
@@ -16,15 +18,23 @@ export function SearchBar() {
         />
         {searchQuery && (
           <button
+            className="search-clear"
             onClick={() => setSearchQuery('')}
-            style={{
-              position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-              background: 'none', border: 'none', color: 'var(--text-muted)',
-              cursor: 'pointer', fontSize: 14, padding: 0,
-            }}
-          >✕</button>
+            title="Clear search"
+          >
+            ✕
+          </button>
         )}
       </div>
+      <div className="search-bar-separator" />
+      <button
+        className="search-bar-save-btn"
+        onClick={openSaveTeamDialog}
+        title={activeTeamName ? `Save changes to ${activeTeamName} or save as new` : 'Save current workspace to Team Library'}
+      >
+        Save Team
+      </button>
     </div>
   );
 }
+

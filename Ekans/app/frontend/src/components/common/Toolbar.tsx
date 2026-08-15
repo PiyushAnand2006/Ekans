@@ -77,12 +77,6 @@ export function Toolbar() {
         <ToolbarButton label="Layout" onClick={handleAutoLayout} title="Auto-arrange nodes" />
         <div className="toolbar-separator" />
         <ToolbarButton
-          label="Save Team"
-          onClick={openSaveTeamDialog}
-          title={activeTeamName ? `Save changes to ${activeTeamName} or save as new` : 'Save current workspace to Team Library'}
-          style={{ color: 'var(--accent-blue)', fontWeight: 600 }}
-        />
-        <ToolbarButton
           label="Library"
           onClick={toggleLibrary}
           title="Open Team Library to browse and import saved teams"

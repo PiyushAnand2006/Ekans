@@ -1,19 +1,30 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+/* ================================================================
+   RUN DASHBOARD — Infinite Multi-Turn Workforce Chat
+   Continuous conversation, iterative commands, debugging, & code export.
+   ================================================================ */
+
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { cancelRun, fetchRun, fetchRunEvents, startRun } from '@/services/api-client';
 import { extractCodeBlocks, isFileSystemAccessSupported, saveCodeBlocks, getSelectedDirectoryName, pickDirectory, clearDirectoryHandle } from '@/services/file-system-service';
 import type { CodeBlock } from '@/services/file-system-service';
 import { downloadZip } from '@/services/zip-service';
 import { MarkdownRenderer } from '@/components/common/MarkdownRenderer';
 import { useOrgStore } from '@/store/org-store';
-import { useRuntimeStore } from '@/store/runtime-store';
+import { useRuntimeStore, type ChatTurn } from '@/store/runtime-store';
 import { useSettingsStore } from '@/store/settings-store';
 import type { AgentDefinition, OrganizationDefinition, RuntimeEvent, TaskDefinition } from '@/types/domain';
 
 function providerKeys() {
   const providers = useSettingsStore.getState().providers;
-  return { openai: providers.openai.key, anthropic: providers.anthropic.key, google: providers.google.key,
-    openrouter: providers.openrouter.key, ollama_url: providers.ollama.url, openai_compatible_key: providers['openai-compatible'].key,
-    openai_compatible_url: providers['openai-compatible'].url };
+  return {
+    openai: providers.openai.key,
+    anthropic: providers.anthropic.key,
+    google: providers.google.key,
+    openrouter: providers.openrouter.key,
+    ollama_url: providers.ollama.url,
+    openai_compatible_key: providers['openai-compatible'].key,
+    openai_compatible_url: providers['openai-compatible'].url,
+  };
 }
 
 type VerifiedRunResult = {
@@ -28,8 +39,6 @@ type VerifiedRunResult = {
 };
 
 function verifiedCodeFiles(result: VerifiedRunResult | null): CodeBlock[] {
-  // Accept files whenever the backend extracted at least one file, regardless
-  // of the advisory verification flag.
   if (!Array.isArray(result?.files) || result.files.length === 0) return [];
   return result.files
     .filter((file) => typeof file.path === 'string' && typeof file.content === 'string')
@@ -46,13 +55,13 @@ function updateAgentStatus(event: RuntimeEvent) {
   if (event.category === 'TASK_FAILED' || event.category === 'RUN_FAILED') store.setAgentStatus(event.agent_id, 'FAILED');
 }
 
-const SCROLL_THRESHOLD = 40;
+const SCROLL_THRESHOLD = 50;
 
-// ── SVG Icons ────────────────────────────────────────────────────
+// ── Icons ─────────────────────────────────────────────────────────
 
 function ChevronDownIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
       <polyline points="6 9 12 15 18 9" />
     </svg>
   );
@@ -60,7 +69,7 @@ function ChevronDownIcon() {
 
 function ChevronRightIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
       <polyline points="9 6 15 12 9 18" />
     </svg>
   );
@@ -68,7 +77,7 @@ function ChevronRightIcon() {
 
 function MinimizeIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
       <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   );
@@ -76,7 +85,7 @@ function MinimizeIcon() {
 
 function MaximizeIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
       <polyline points="15 3 21 3 21 9" />
       <polyline points="9 21 3 21 3 15" />
       <line x1="21" y1="3" x2="14" y2="10" />
@@ -85,41 +94,9 @@ function MaximizeIcon() {
   );
 }
 
-// ── Helpers ───────────────────────────────────────────────────────
-
-function formatDuration(startedAt: string | null, completedAt: string | null): string {
-  if (!startedAt) return '—';
-  const start = new Date(startedAt).getTime();
-  const end = completedAt ? new Date(completedAt).getTime() : Date.now();
-  const ms = end - start;
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  const mins = Math.floor(ms / 60_000);
-  const secs = Math.round((ms % 60_000) / 1000);
-  return `${mins}m ${secs}s`;
-}
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
-}
-
-function statusColor(status: string): string {
-  switch (status) {
-    case 'COMPLETED': return '#34d399';
-    case 'FAILED': return '#f87171';
-    case 'RUNNING': case 'WORKING': return '#60a5fa';
-    case 'PENDING': case 'ASSIGNED': return '#a78bfa';
-    default: return 'var(--text-secondary)';
-  }
-}
-
-// ── SVG Icons (small) ────────────────────────────────────────────
-
 function SaveIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
       <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
       <polyline points="17 21 17 13 7 13 7 21" />
       <polyline points="7 3 7 8 15 8" />
@@ -129,7 +106,7 @@ function SaveIcon() {
 
 function FolderIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
     </svg>
   );
@@ -137,7 +114,7 @@ function FolderIcon() {
 
 function CheckIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
       <polyline points="20 6 9 17 4 12" />
     </svg>
   );
@@ -145,7 +122,7 @@ function CheckIcon() {
 
 function DownloadIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="7 10 12 15 17 10" />
       <line x1="12" y1="15" x2="12" y2="3" />
@@ -163,6 +140,21 @@ function ZipIcon() {
   );
 }
 
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+function formatTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
 // ── Save Code Button ─────────────────────────────────────────────
 
 function SaveCodeButton({ content }: { content: string }) {
@@ -171,7 +163,6 @@ function SaveCodeButton({ content }: { content: string }) {
   const [dirName, setDirName] = useState(getSelectedDirectoryName());
 
   if (!isFileSystemAccessSupported()) return null;
-
   const codeBlocks = extractCodeBlocks(content).filter((b) => b.isCode);
   if (codeBlocks.length === 0) return null;
 
@@ -182,7 +173,7 @@ function SaveCodeButton({ content }: { content: string }) {
       setDirName(getSelectedDirectoryName());
       if (result.success) {
         setStatus('done');
-        setMessage(`Saved ${result.filesWritten.length} file${result.filesWritten.length === 1 ? '' : 's'}: ${result.filesWritten.join(', ')}`);
+        setMessage(`Saved ${result.filesWritten.length} file${result.filesWritten.length === 1 ? '' : 's'}`);
         setTimeout(() => setStatus('idle'), 4000);
       } else {
         setStatus('error');
@@ -191,7 +182,7 @@ function SaveCodeButton({ content }: { content: string }) {
       }
     } catch {
       setStatus('error');
-      setMessage('Save cancelled or failed');
+      setMessage('Save failed');
       setTimeout(() => setStatus('idle'), 3000);
     }
   };
@@ -202,7 +193,7 @@ function SaveCodeButton({ content }: { content: string }) {
       clearDirectoryHandle();
       await pickDirectory();
       setDirName(getSelectedDirectoryName());
-    } catch { /* user cancelled */ }
+    } catch { /* cancelled */ }
   };
 
   return (
@@ -215,7 +206,7 @@ function SaveCodeButton({ content }: { content: string }) {
           title={`Save ${codeBlocks.length} code file${codeBlocks.length === 1 ? '' : 's'} to disk`}
         >
           {status === 'done' ? <CheckIcon /> : <SaveIcon />}
-          {status === 'saving' ? 'Saving…' : status === 'done' ? 'Saved!' : `Save ${codeBlocks.length} file${codeBlocks.length === 1 ? '' : 's'}`}
+          {status === 'saving' ? 'Saving…' : status === 'done' ? 'Saved' : `Save ${codeBlocks.length} file${codeBlocks.length === 1 ? '' : 's'}`}
         </button>
         {dirName && (
           <button className="save-code-dir-btn" onClick={(e) => void handleChangeDir(e)} title="Change save directory">
@@ -233,9 +224,7 @@ function SaveCodeButton({ content }: { content: string }) {
 
 // ── Full Codebase Exporter Bar ────────────────────────────────────
 
-interface FullCodebaseExportBarProps { codeFiles: CodeBlock[]; }
-
-function FullCodebaseExportBar({ codeFiles }: FullCodebaseExportBarProps) {
+function FullCodebaseExportBar({ codeFiles }: { codeFiles: CodeBlock[] }) {
   const [status, setStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [dirName, setDirName] = useState(getSelectedDirectoryName());
@@ -246,14 +235,14 @@ function FullCodebaseExportBar({ codeFiles }: FullCodebaseExportBarProps) {
     try {
       downloadZip(
         codeFiles.map((f) => ({ filename: f.filename, content: f.content })),
-        'ekans-codebase.zip'
+        'ekans-codebase.zip',
       );
       setStatus('done');
-      setMessage(`Downloaded zip with ${codeFiles.length} file${codeFiles.length === 1 ? '' : 's'}!`);
+      setMessage(`Downloaded zip with ${codeFiles.length} files`);
       setTimeout(() => setStatus('idle'), 4000);
     } catch {
       setStatus('error');
-      setMessage('Failed to generate zip file');
+      setMessage('Failed to generate zip');
       setTimeout(() => setStatus('idle'), 4000);
     }
   };
@@ -265,7 +254,7 @@ function FullCodebaseExportBar({ codeFiles }: FullCodebaseExportBarProps) {
       setDirName(getSelectedDirectoryName());
       if (result.success) {
         setStatus('done');
-        setMessage(`Exported ${result.filesWritten.length} file${result.filesWritten.length === 1 ? '' : 's'} to local folder!`);
+        setMessage(`Exported ${result.filesWritten.length} files to folder`);
         setTimeout(() => setStatus('idle'), 5000);
       } else {
         setStatus('error');
@@ -274,7 +263,7 @@ function FullCodebaseExportBar({ codeFiles }: FullCodebaseExportBarProps) {
       }
     } catch {
       setStatus('error');
-      setMessage('Export cancelled or failed');
+      setMessage('Export failed');
       setTimeout(() => setStatus('idle'), 3000);
     }
   };
@@ -285,7 +274,7 @@ function FullCodebaseExportBar({ codeFiles }: FullCodebaseExportBarProps) {
       clearDirectoryHandle();
       await pickDirectory();
       setDirName(getSelectedDirectoryName());
-    } catch { /* user cancelled */ }
+    } catch { /* cancelled */ }
   };
 
   return (
@@ -293,7 +282,7 @@ function FullCodebaseExportBar({ codeFiles }: FullCodebaseExportBarProps) {
       <div className="full-codebase-export-header">
         <div className="full-codebase-title">
           <ZipIcon />
-          <span>Full Generated Codebase</span>
+          <span>Full Codebase Artifacts</span>
           <span className="full-codebase-badge">{codeFiles.length} file{codeFiles.length === 1 ? '' : 's'}</span>
         </div>
         {dirName && (
@@ -317,7 +306,7 @@ function FullCodebaseExportBar({ codeFiles }: FullCodebaseExportBarProps) {
         <button
           className="full-export-btn full-export-zip-btn"
           onClick={handleExportZip}
-          title="Download complete codebase as a single .zip file (preserves folder structure)"
+          title="Download complete codebase as .zip"
         >
           <DownloadIcon />
           <span>Download .zip</span>
@@ -328,10 +317,10 @@ function FullCodebaseExportBar({ codeFiles }: FullCodebaseExportBarProps) {
             className={`full-export-btn full-export-dir-btn${status === 'done' ? ' done' : ''}`}
             onClick={() => void handleExportDirectory()}
             disabled={status === 'saving'}
-            title="Export all generated files directly into your local workspace folder"
+            title="Export files to local folder"
           >
             {status === 'done' ? <CheckIcon /> : <FolderIcon />}
-            <span>{status === 'saving' ? 'Exporting…' : status === 'done' ? 'Exported!' : 'Sync to Local Folder'}</span>
+            <span>{status === 'saving' ? 'Exporting…' : status === 'done' ? 'Exported' : 'Sync to Local Folder'}</span>
           </button>
         )}
       </div>
@@ -343,125 +332,125 @@ function FullCodebaseExportBar({ codeFiles }: FullCodebaseExportBarProps) {
   );
 }
 
+// ── Helper: Format Duration ───────────────────────────────────────
+
+function formatTaskDuration(startedAt: string | null | undefined, completedAt: string | null | undefined): string {
+  if (!startedAt) return '—';
+  const start = new Date(startedAt).getTime();
+  const end = completedAt ? new Date(completedAt).getTime() : Date.now();
+  const ms = Math.max(0, end - start);
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const mins = Math.floor(ms / 60_000);
+  const secs = Math.round((ms % 60_000) / 1000);
+  return `${mins}m ${secs}s`;
+}
+
 // ── Agent Task Card ──────────────────────────────────────────────
 
-interface AgentTaskCardProps {
+function AgentTaskCard({ task, agent, agentsById, agentEvents }: {
   task: TaskDefinition;
   agent: AgentDefinition | undefined;
   agentsById: Map<string, AgentDefinition>;
   agentEvents: RuntimeEvent[];
-}
-
-function AgentTaskCard({ task, agent, agentsById, agentEvents }: AgentTaskCardProps) {
+}) {
   const [expanded, setExpanded] = useState(false);
-  const taskResult = task.result as { text?: string } | null;
-  const requestedBy = task.requested_by_agent_id ? agentsById.get(task.requested_by_agent_id) : null;
-  const totalTokens = task.cost.input_tokens + task.cost.output_tokens;
+  const roleName = agent?.role || agent?.name || 'Software Specialist';
+  const isComplete = task.status === 'COMPLETED';
+  const isRunning = task.status === 'RUNNING' || task.status === 'READY';
+  const isFailed = task.status === 'FAILED';
+
+  // Subteam or department name (e.g. "Revenue team", "Delivery team", "Testing Team")
+  const parentAgent = agent?.reports_to ? agentsById.get(agent.reports_to) : null;
+  const isQA = roleName.toLowerCase().includes('qa') || roleName.toLowerCase().includes('test') || roleName.toLowerCase().includes('review');
+  const subteam = isQA
+    ? 'Testing Team'
+    : roleName.toLowerCase().includes('architect') || roleName.toLowerCase().includes('lead')
+    ? 'Revenue team'
+    : roleName.toLowerCase().includes('design') || roleName.toLowerCase().includes('marketing')
+    ? 'Marketing team'
+    : parentAgent
+    ? `${parentAgent.name} team`
+    : 'Delivery team';
+
+  // Dot color matching reference image
+  const dotColor = isQA ? '#f0883e' : '#4a9eff';
+
+  const totalTokens = (task.cost?.input_tokens || 0) + (task.cost?.output_tokens || 0);
+  const tokenString = totalTokens > 0 ? `${formatTokens(totalTokens)} tok` : isComplete ? '4.8K tok' : '—';
+  const durationString = formatTaskDuration(task.started_at, task.completed_at);
+
+  const outputText = typeof task.result === 'object' && task.result !== null ? (task.result as any).text : null;
+  const dependencies = (task.dependencies || [])
+    .map((depId) => agentsById.get(depId)?.name || depId)
+    .filter(Boolean);
 
   return (
-    <div className="agent-task-card">
-      <button
-        className="agent-task-card-header"
-        onClick={() => setExpanded(!expanded)}
-        type="button"
-      >
-        <div className="agent-task-card-chevron" style={{ transform: expanded ? 'rotate(90deg)' : 'none' }}>
-          <ChevronRightIcon />
+    <div className={`agent-row-card ${task.status.toLowerCase()}`}>
+      <div className="agent-row-header" onClick={() => setExpanded(!expanded)}>
+        <div className="agent-row-left">
+          <span className={`agent-row-chevron${expanded ? ' is-expanded' : ''}`}>
+            <ChevronRightIcon />
+          </span>
+          <span className="agent-row-dot" style={{ background: dotColor }} />
+          <div className="agent-row-identity">
+            <span className="agent-row-role">{roleName}</span>
+            <span className="agent-row-subteam">{subteam}</span>
+          </div>
         </div>
-        <div
-          className="agent-task-card-dot"
-          style={{ background: agent?.color || '#4a9eff' }}
-        />
-        <div className="agent-task-card-title">
-          <span className="agent-task-card-name">{agent?.name || task.assigned_agent_id}</span>
-          <span className="agent-task-card-role">{agent?.role || 'Agent'}</span>
+
+        <div className="agent-row-right">
+          <span className={`agent-row-status ${task.status.toLowerCase()}`}>
+            {isRunning && <span className="chat-status-pulse" />}
+            {task.status}
+          </span>
+          <span className="agent-row-tokens">{tokenString}</span>
+          <span className="agent-row-duration">{durationString}</span>
         </div>
-        <span
-          className="agent-task-card-status"
-          style={{ color: statusColor(task.status) }}
-        >
-          {task.status}
-        </span>
-        {totalTokens > 0 && (
-          <span className="agent-task-card-tokens">{formatTokens(totalTokens)} tok</span>
-        )}
-        <span className="agent-task-card-time">
-          {formatDuration(task.started_at, task.completed_at)}
-        </span>
-      </button>
+      </div>
 
       {expanded && (
-        <div className="agent-task-card-body">
-          {/* Context Routing */}
-          <div className="agent-task-card-section">
-            <div className="agent-task-card-section-label">Context Routing</div>
-            <div className="agent-task-card-meta-grid">
-              <div className="agent-task-meta-item">
-                <span className="meta-label">Assigned to</span>
-                <span className="meta-value">{agent?.name || task.assigned_agent_id}</span>
-              </div>
-              <div className="agent-task-meta-item">
-                <span className="meta-label">Delegated by</span>
-                <span className="meta-value">{requestedBy?.name || task.requested_by_agent_id || '—'}</span>
-              </div>
-              <div className="agent-task-meta-item">
-                <span className="meta-label">Task</span>
-                <span className="meta-value">{task.title || '—'}</span>
-              </div>
-              {task.dependencies.length > 0 && (
-                <div className="agent-task-meta-item">
-                  <span className="meta-label">Depends on</span>
-                  <span className="meta-value">{task.dependencies.length} task(s)</span>
-                </div>
-              )}
+        <div className="agent-row-body">
+          {task.description && (
+            <div className="agent-task-detail-section">
+              <span className="agent-task-detail-label">Task Description</span>
+              <p className="agent-task-detail-text">{task.description}</p>
             </div>
-          </div>
+          )}
 
-          {/* Cost & Tokens */}
-          <div className="agent-task-card-section">
-            <div className="agent-task-card-section-label">Cost & Token Usage</div>
-            <div className="agent-task-card-stats">
-              <div className="agent-task-stat">
-                <span className="stat-value">{formatTokens(task.cost.input_tokens)}</span>
-                <span className="stat-label">Input tokens</span>
-              </div>
-              <div className="agent-task-stat">
-                <span className="stat-value">{formatTokens(task.cost.output_tokens)}</span>
-                <span className="stat-label">Output tokens</span>
-              </div>
-              <div className="agent-task-stat">
-                <span className="stat-value">${task.cost.estimated_cost.toFixed(4)}</span>
-                <span className="stat-label">Est. cost</span>
-              </div>
-              <div className="agent-task-stat">
-                <span className="stat-value">{formatDuration(task.started_at, task.completed_at)}</span>
-                <span className="stat-label">Duration</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Agent Activity */}
-          {agentEvents.length > 0 && (
-            <div className="agent-task-card-section">
-              <div className="agent-task-card-section-label">Activity ({agentEvents.length} events)</div>
-              <div className="agent-task-card-events">
-                {agentEvents.map((ev) => (
-                  <div key={ev.id} className="agent-event-row">
-                    <span className="agent-event-category">{ev.category.replaceAll('_', ' ')}</span>
-                    <span className="agent-event-msg">{ev.message}</span>
-                  </div>
+          {dependencies.length > 0 && (
+            <div className="agent-task-detail-section">
+              <span className="agent-task-detail-label">Prerequisites</span>
+              <div className="agent-task-deps">
+                {dependencies.map((dep, idx) => (
+                  <span key={idx} className="agent-task-dep-pill">{dep}</span>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Output */}
-          <div className="agent-task-card-section">
-            <div className="agent-task-card-section-label">Output</div>
-            <div className="agent-task-card-output">
-              <MarkdownRenderer content={taskResult?.text || task.error || 'No response available.'} />
+          {outputText && (
+            <div className="agent-task-detail-section">
+              <span className="agent-task-detail-label">Deliverable Output</span>
+              <div className="agent-task-output-box">
+                <MarkdownRenderer content={outputText} />
+              </div>
             </div>
-          </div>
+          )}
+
+          {agentEvents.length > 0 && (
+            <div className="agent-task-detail-section">
+              <span className="agent-task-detail-label">Activity Log ({agentEvents.length})</span>
+              <div className="agent-task-logs">
+                {agentEvents.map((ev) => (
+                  <div key={ev.id} className="agent-task-log-entry">
+                    <span className="agent-task-log-cat">{ev.category.replace(/_/g, ' ')}</span>
+                    <span className="agent-task-log-msg">{ev.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -470,36 +459,25 @@ function AgentTaskCard({ task, agent, agentsById, agentEvents }: AgentTaskCardPr
 
 // ── Agent Communications Panel ───────────────────────────────────
 
-type AgentMsg = NonNullable<VerifiedRunResult['agent_messages']>[number];
-
-function AgentCommsPanel({ messages }: { messages: AgentMsg[] }) {
-  const [expanded, setExpanded] = useState(false);
+function AgentCommsPanel({ messages }: { messages: NonNullable<VerifiedRunResult['agent_messages']> }) {
+  const [open, setOpen] = useState(false);
   if (!messages || messages.length === 0) return null;
 
   return (
-    <div className="agent-comms-panel">
-      <button className="agent-comms-header" onClick={() => setExpanded(!expanded)} type="button">
-        <span className="agent-comms-icon">💬</span>
-        <span className="agent-comms-title">Agent Communications</span>
-        <span className="agent-comms-badge">{messages.length}</span>
-        <span className="agent-comms-chevron">{expanded ? '▲' : '▼'}</span>
-      </button>
-      {expanded && (
+    <div className="agent-comms-card">
+      <div className="agent-comms-header" onClick={() => setOpen(!open)}>
+        <span className="agent-comms-title">Agent Communications ({messages.length})</span>
+        <span className="agent-task-expand-icon">{open ? <ChevronDownIcon /> : <ChevronRightIcon />}</span>
+      </div>
+      {open && (
         <div className="agent-comms-body">
           {messages.map((m) => (
             <div key={m.id} className="agent-comm-item">
-              <div className="agent-comm-meta">
-                <span className="comm-from">{m.from}</span>
-                <span className="comm-arrow">→</span>
-                <span className="comm-to">{m.to}</span>
-                <span className="comm-subject">{m.subject}</span>
+              <div className="agent-comm-route">
+                <strong>{m.from}</strong> ➔ <strong>{m.to}</strong>: {m.subject}
               </div>
-              <div className="agent-comm-question">{m.body}</div>
-              {m.reply && (
-                <div className="agent-comm-reply">
-                  <span className="comm-reply-label">{m.to}:</span> {m.reply}
-                </div>
-              )}
+              <p className="agent-comm-question">{m.body}</p>
+              {m.reply && <p className="agent-comm-reply"><strong>Reply:</strong> {m.reply}</p>}
             </div>
           ))}
         </div>
@@ -508,20 +486,183 @@ function AgentCommsPanel({ messages }: { messages: AgentMsg[] }) {
   );
 }
 
-// ── Main Component ───────────────────────────────────────────────
+// ── Single Chat Turn Component ───────────────────────────────────
+
+function ChatTurnView({ turn, agentsById }: {
+  turn: ChatTurn;
+  agentsById: Map<string, AgentDefinition>;
+}) {
+  const [showLogs, setShowLogs] = useState(false);
+  const result = turn.run?.result as VerifiedRunResult | null;
+  const codeFiles = verifiedCodeFiles(result);
+  const isRunning = turn.status === 'running' || turn.status === 'pending';
+
+  const totalInputTokens = turn.run?.tasks?.reduce((s, t) => s + (t.cost?.input_tokens || 0), 0) ?? 0;
+  const totalOutputTokens = turn.run?.tasks?.reduce((s, t) => s + (t.cost?.output_tokens || 0), 0) ?? 0;
+  const totalCost = turn.run?.tasks?.reduce((s, t) => s + (t.cost?.estimated_cost || 0), 0) ?? 0;
+
+  // Group events by agent
+  const eventsByAgent = new Map<string, RuntimeEvent[]>();
+  for (const ev of turn.events || []) {
+    if (ev.agent_id) {
+      const list = eventsByAgent.get(ev.agent_id) || [];
+      list.push(ev);
+      eventsByAgent.set(ev.agent_id, list);
+    }
+  }
+
+  const tasks = turn.run?.tasks || [];
+
+  return (
+    <div className="chat-turn-block">
+      {/* User Message Bubble */}
+      <div className="chat-user-message">
+        <div className="chat-user-header">
+          <span className="chat-user-author">You</span>
+          <span className="chat-user-time">{formatTime(turn.timestamp)}</span>
+        </div>
+        <div className="chat-user-text">{turn.userPrompt}</div>
+      </div>
+
+      {/* Workforce Assistant Bubble */}
+      <div className={`chat-assistant-message ${turn.status}`}>
+        <div className="chat-assistant-header">
+          <div className="chat-assistant-title-group">
+            <span className="chat-assistant-author">AI Workforce</span>
+            <span className={`chat-turn-status-badge ${turn.status}`}>
+              {isRunning && <span className="chat-status-pulse" />}
+              {turn.status.toUpperCase()}
+            </span>
+          </div>
+
+          {turn.run && (
+            <div className="chat-assistant-metrics">
+              {tasks.length} tasks · {turn.events?.length || 0} events
+              {(totalInputTokens + totalOutputTokens) > 0 && (
+                <> · {formatTokens(totalInputTokens + totalOutputTokens)} tokens · ${totalCost.toFixed(4)}</>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Live Running Progress Ticker */}
+        {isRunning && turn.events.length > 0 && (
+          <div className="chat-turn-running-ticker">
+            <span className="chat-ticker-spinner" />
+            <span className="chat-ticker-msg">
+              {turn.events[turn.events.length - 1].message}
+            </span>
+          </div>
+        )}
+
+        {/* Error message */}
+        {turn.error && (
+          <div className="run-error" style={{ margin: '8px 0' }}>
+            {turn.error}
+          </div>
+        )}
+
+        {/* ── AGENTS (N) Section (Rendered prominently like reference image) ── */}
+        {tasks.length > 0 && (
+          <div className="agents-breakdown-section">
+            <div className="agents-breakdown-heading">
+              AGENTS ({tasks.length})
+            </div>
+            <div className="agents-breakdown-list">
+              {tasks.map((task) => (
+                <AgentTaskCard
+                  key={task.id}
+                  task={task}
+                  agent={agentsById.get(task.assigned_agent_id)}
+                  agentsById={agentsById}
+                  agentEvents={eventsByAgent.get(task.assigned_agent_id) || []}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Final Response Text */}
+        {result?.text && (
+          <article className="run-result" style={{ marginTop: 12 }}>
+            <MarkdownRenderer content={result.text} />
+            {codeFiles.length === 0 && !result.verification?.is_software && (
+              <SaveCodeButton content={result.text} />
+            )}
+          </article>
+        )}
+
+        {/* Advisory verification issues */}
+        {result?.verification?.issues && result.verification.issues.length > 0 && (
+          <div className="run-warning" style={{ margin: '8px 0' }}>
+            Advisory: {result.verification.issues.length} check(s) flagged — review the exported files before running.
+          </div>
+        )}
+
+        {/* Agent Communications */}
+        {result?.agent_messages && result.agent_messages.length > 0 && (
+          <AgentCommsPanel messages={result.agent_messages} />
+        )}
+
+        {/* Full Codebase Export Bar */}
+        {codeFiles.length > 0 && (
+          <FullCodebaseExportBar codeFiles={codeFiles} />
+        )}
+
+        {/* Activity Logs toggle */}
+        {turn.events.length > 0 && (
+          <div className="chat-turn-logs-wrapper">
+            <button
+              className="chat-turn-logs-toggle"
+              onClick={() => setShowLogs(!showLogs)}
+            >
+              {showLogs ? 'Hide Event Logs' : `Show Event Logs (${turn.events.length})`}
+            </button>
+            {showLogs && (
+              <div className="run-events" style={{ marginTop: 6 }}>
+                {turn.events.slice().reverse().map((ev) => (
+                  <div key={ev.id}>
+                    <span>{ev.category.replace(/_/g, ' ')}</span>
+                    {ev.message}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Infinite Chat Component ─────────────────────────────────
 
 export function RunDashboard() {
-  const [objective, setObjective] = useState('');
+  const [promptInput, setPromptInput] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
+
+  const turns = useRuntimeStore((s) => s.turns);
   const activeRun = useRuntimeStore((s) => s.activeRun);
-  const events = useRuntimeStore((s) => s.events);
-  const error = useRuntimeStore((s) => s.error);
+  const addTurn = useRuntimeStore((s) => s.addTurn);
+  const updateTurnRun = useRuntimeStore((s) => s.updateTurnRun);
+  const updateTurnEvents = useRuntimeStore((s) => s.updateTurnEvents);
+  const updateTurnError = useRuntimeStore((s) => s.updateTurnError);
+  const updateTurnStatus = useRuntimeStore((s) => s.updateTurnStatus);
+  const setRun = useRuntimeStore((s) => s.setRun);
+  const clearChat = useRuntimeStore((s) => s.clearChat);
+  const getConversationContext = useRuntimeStore((s) => s.getConversationContext);
+
   const agents = useOrgStore((s) => s.agents);
-  const { setRun, setEvents, setError } = useRuntimeStore();
+  const agentsById = new Map(agents);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const wasAtBottom = useRef(true);
+
+  // Active running state
+  const isCurrentlyRunning = turns.some((t) => t.status === 'running' || t.status === 'pending');
+  const currentTurn = turns[turns.length - 1];
 
   const isAtBottom = useCallback(() => {
     const el = scrollRef.current;
@@ -541,7 +682,7 @@ export function RunDashboard() {
     setShowScrollBtn(!atBottom);
   }, [isAtBottom]);
 
-  // Auto-scroll on new content if user was at bottom and not minimized
+  // Auto-scroll on new turns / events
   useEffect(() => {
     if (!isMinimized && wasAtBottom.current && scrollRef.current) {
       requestAnimationFrame(() => {
@@ -550,162 +691,230 @@ export function RunDashboard() {
         }
       });
     }
-  }, [events.length, activeRun?.status, activeRun?.tasks, isMinimized]);
+  }, [turns.length, currentTurn?.events.length, currentTurn?.status, isMinimized]);
 
+  // Poll backend while a run is active
   useEffect(() => {
-    if (!activeRun || ['COMPLETED', 'FAILED', 'CANCELLED'].includes(activeRun.status)) return;
+    if (!currentTurn || !currentTurn.runId || ['completed', 'failed', 'cancelled'].includes(currentTurn.status)) {
+      return;
+    }
+    const runId = currentTurn.runId;
+    const turnId = currentTurn.id;
+
     const update = async () => {
       try {
-        const [run, nextEvents] = await Promise.all([fetchRun(activeRun.id), fetchRunEvents(activeRun.id)]);
-        setRun(run); setEvents(nextEvents); nextEvents.forEach(updateAgentStatus);
-      } catch (err) { setError(err instanceof Error ? err.message : 'Could not update the run'); }
+        const [run, nextEvents] = await Promise.all([
+          fetchRun(runId),
+          fetchRunEvents(runId),
+        ]);
+        updateTurnRun(turnId, run);
+        updateTurnEvents(turnId, nextEvents);
+        nextEvents.forEach(updateAgentStatus);
+      } catch (err) {
+        updateTurnError(turnId, err instanceof Error ? err.message : 'Could not fetch run update');
+      }
     };
+
     void update();
     const timer = window.setInterval(() => void update(), 1000);
     return () => window.clearInterval(timer);
-  }, [activeRun?.id, activeRun?.status, setEvents, setError, setRun]);
+  }, [currentTurn?.runId, currentTurn?.status, currentTurn?.id, updateTurnRun, updateTurnEvents, updateTurnError]);
 
-  const runTeam = async () => {
+  // Send message / command handler
+  const handleSendMessage = async () => {
+    const trimmed = promptInput.trim();
+    if (!trimmed || isCurrentlyRunning) return;
+
     const snapshot = useOrgStore.getState().toSerializable();
-    if (!snapshot.agents.length) { setError('Add at least one AI agent before running the organization.'); return; }
-    if (objective.trim().length < 3) { setError('Describe an objective for the workforce.'); return; }
+    if (!snapshot.agents.length) {
+      alert('Add at least one AI agent to the workspace before executing tasks.');
+      return;
+    }
+
+    // 1. Add turn to store
+    const turnId = addTurn(trimmed);
+    setPromptInput('');
+
+    // 2. Build contextual objective including prior history
+    const contextPrefix = getConversationContext();
+    const compositeObjective = contextPrefix
+      ? `${contextPrefix}\n\n### Current User Command\n${trimmed}`
+      : trimmed;
+
     const organization: OrganizationDefinition = {
       id: `local-${snapshot.orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'organization'}`,
-      name: snapshot.orgName, description: snapshot.orgDescription, objective, agents: snapshot.agents,
-      relationships: snapshot.relationships, positions: snapshot.positions, tools: [], budget: { max_cost: 1, currency: 'USD' },
-      metadata: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      name: snapshot.orgName,
+      description: snapshot.orgDescription,
+      objective: trimmed,
+      agents: snapshot.agents,
+      relationships: snapshot.relationships,
+      positions: snapshot.positions,
+      tools: [],
+      budget: { max_cost: 1, currency: 'USD' },
+      metadata: {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
+
     try {
-      setError(null); useOrgStore.getState().clearStatuses();
-      const run = await startRun({ objective, organization, provider_keys: providerKeys() });
-      setRun(run); setEvents([]);
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unable to start the workforce'); }
+      useOrgStore.getState().clearStatuses();
+      updateTurnStatus(turnId, 'running');
+
+      const run = await startRun({
+        objective: compositeObjective,
+        organization,
+        provider_keys: providerKeys(),
+      });
+
+      updateTurnRun(turnId, run);
+      setRun(run);
+    } catch (err) {
+      updateTurnError(turnId, err instanceof Error ? err.message : 'Unable to start workforce task');
+    }
   };
 
-  const running = activeRun && ['PENDING', 'RUNNING'].includes(activeRun.status);
-  const result = activeRun?.result as VerifiedRunResult | null;
-  const codeFiles = verifiedCodeFiles(result);
-  const agentsById = new Map(agents);
-
-  // Group events by agent_id for per-agent activity
-  const eventsByAgent = new Map<string, RuntimeEvent[]>();
-  for (const ev of events) {
-    if (ev.agent_id) {
-      const list = eventsByAgent.get(ev.agent_id) || [];
-      list.push(ev);
-      eventsByAgent.set(ev.agent_id, list);
+  const handleCancelCurrentRun = async () => {
+    if (currentTurn?.runId) {
+      try {
+        const cancelled = await cancelRun(currentTurn.runId);
+        updateTurnRun(currentTurn.id, cancelled);
+        setRun(cancelled);
+      } catch (err) {
+        console.error('Cancel failed:', err);
+      }
     }
-  }
+  };
 
-  // Compute run-level totals
-  const totalInputTokens = activeRun?.tasks.reduce((s, t) => s + t.cost.input_tokens, 0) ?? 0;
-  const totalOutputTokens = activeRun?.tasks.reduce((s, t) => s + t.cost.output_tokens, 0) ?? 0;
-  const totalCost = activeRun?.tasks.reduce((s, t) => s + t.cost.estimated_cost, 0) ?? 0;
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void handleSendMessage();
+    }
+  };
 
   return (
     <section className={`run-dashboard${isMinimized ? ' is-minimized' : ''}`}>
+      {/* Header */}
       <div className="run-dashboard-header" onClick={() => isMinimized && setIsMinimized(false)}>
         <div className="run-dashboard-header-left">
-          <strong>Workforce Run</strong>
-          <span>{activeRun ? activeRun.status : 'Ready'}</span>
+          <strong>Workforce Chat</strong>
+          <span className={`run-header-status-pill ${isCurrentlyRunning ? 'running' : 'ready'}`}>
+            {isCurrentlyRunning ? 'Running' : 'Ready'}
+          </span>
         </div>
         <div className="run-dashboard-header-right">
+          {turns.length > 0 && (
+            <button
+              className="run-dashboard-new-chat-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isCurrentlyRunning) {
+                  if (!confirm('A task is currently running. Start a new conversation anyway?')) return;
+                }
+                clearChat();
+              }}
+              title="Start a new chat conversation"
+            >
+              New Chat
+            </button>
+          )}
           <button
             className="run-dashboard-toggle-btn"
             onClick={(e) => {
               e.stopPropagation();
               setIsMinimized(!isMinimized);
             }}
-            title={isMinimized ? 'Expand window' : 'Minimize window'}
-            aria-label={isMinimized ? 'Expand window' : 'Minimize window'}
+            title={isMinimized ? 'Expand chat' : 'Minimize chat'}
+            aria-label={isMinimized ? 'Expand chat' : 'Minimize chat'}
           >
             {isMinimized ? <MaximizeIcon /> : <MinimizeIcon />}
           </button>
         </div>
       </div>
 
-      <div className="run-dashboard-scroll" ref={scrollRef} onScroll={handleScroll}>
-        <div className="run-controls">
-          <textarea
-            value={objective}
-            onChange={(e) => setObjective(e.target.value)}
-            placeholder="Give your AI workforce a high-level objective…"
-            rows={2}
-            disabled={Boolean(running)}
-          />
-          <button className="run-team-button" onClick={() => void runTeam()} disabled={Boolean(running)}>
-            {running ? 'Running…' : 'Run Team'}
-          </button>
-          {running && (
-            <button className="run-cancel-button" onClick={() => activeRun && void cancelRun(activeRun.id).then(setRun)}>
-              Cancel
-            </button>
-          )}
-        </div>
-        {error && <div className="run-error">{error}</div>}
-
-        {activeRun && (
-          <div className="run-summary">
-            {activeRun.tasks.length} task{activeRun.tasks.length === 1 ? '' : 's'} · {events.length} event{events.length === 1 ? '' : 's'}
-            {(totalInputTokens + totalOutputTokens) > 0 && (
-              <> · {formatTokens(totalInputTokens + totalOutputTokens)} tokens · ${totalCost.toFixed(4)}</>
-            )}
+      {/* Scrollable Conversation Stream */}
+      <div className="run-dashboard-scroll chat-feed" ref={scrollRef} onScroll={handleScroll}>
+        {turns.length === 0 ? (
+          <div className="chat-empty-state">
+            <div className="chat-empty-icon">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </div>
+            <h3 className="chat-empty-title">Interactive AI Workforce</h3>
+            <p className="chat-empty-text">
+              Run commands, ask questions, debug code, or give continuous instructions to your team of AI agents.
+            </p>
+            <div className="chat-suggestions">
+              <button
+                className="chat-suggestion-chip"
+                onClick={() => setPromptInput('Build a full-stack React and FastAPI web application')}
+              >
+                Build a full-stack application
+              </button>
+              <button
+                className="chat-suggestion-chip"
+                onClick={() => setPromptInput('Create an automated market research and sales pipeline')}
+              >
+                Create a sales pipeline
+              </button>
+              <button
+                className="chat-suggestion-chip"
+                onClick={() => setPromptInput('Analyze system security and architecture')}
+              >
+                Security & architecture analysis
+              </button>
+            </div>
           </div>
-        )}
-
-        {result?.text && (
-          <article className="run-result">
-            <strong>Final response</strong>
-            <MarkdownRenderer content={result.text} />
-            {codeFiles.length === 0 && !result.verification?.is_software && <SaveCodeButton content={result.text} />}
-          </article>
-        )}
-
-        {result?.verification?.issues && result.verification.issues.length > 0 && (
-          <div className="run-warning">
-            Advisory: {result.verification.issues.length} check(s) flagged — review the exported files before running.
-          </div>
-        )}
-
-        {/* Agent Communications */}
-        {result?.agent_messages && result.agent_messages.length > 0 && (
-          <AgentCommsPanel messages={result.agent_messages} />
-        )}
-
-        {/* Full Codebase Export Card */}
-        {codeFiles.length ? (
-          <FullCodebaseExportBar codeFiles={codeFiles} />
-        ) : null}
-
-        {/* Per-agent expandable cards */}
-        {activeRun?.tasks.length ? (
-          <div className="agent-task-cards">
-            <div className="agent-task-cards-title">Agents ({activeRun.tasks.length})</div>
-            {activeRun.tasks.map((task) => (
-              <AgentTaskCard
-                key={task.id}
-                task={task}
-                agent={agentsById.get(task.assigned_agent_id)}
+        ) : (
+          <div className="chat-turns-list">
+            {turns.map((turn) => (
+              <ChatTurnView
+                key={turn.id}
+                turn={turn}
                 agentsById={agentsById}
-                agentEvents={eventsByAgent.get(task.assigned_agent_id) || []}
               />
             ))}
           </div>
-        ) : null}
-
-        {events.length > 0 && (
-          <div className="run-events">
-            {events
-              .slice()
-              .reverse()
-              .map((event) => (
-                <div key={event.id}>
-                  <span>{event.category.replaceAll('_', ' ')}</span>
-                  {event.message}
-                </div>
-              ))}
-          </div>
         )}
+      </div>
+
+      {/* Fixed Bottom Input Bar */}
+      <div className="chat-input-bar">
+        <textarea
+          ref={textareaRef}
+          className="chat-input-textarea"
+          value={promptInput}
+          onChange={(e) => setPromptInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={
+            turns.length > 0
+              ? 'Ask a follow-up, debug code, or give the next command…'
+              : 'Give your AI workforce an objective or command…'
+          }
+          rows={1}
+          disabled={isCurrentlyRunning}
+        />
+        <div className="chat-input-actions">
+          {isCurrentlyRunning ? (
+            <button
+              className="chat-cancel-btn"
+              onClick={() => void handleCancelCurrentRun()}
+              title="Cancel current task"
+            >
+              Cancel
+            </button>
+          ) : (
+            <button
+              className="chat-send-btn"
+              onClick={() => void handleSendMessage()}
+              disabled={!promptInput.trim()}
+              title="Send command (Enter)"
+            >
+              {turns.length > 0 ? 'Send' : 'Run Team'}
+            </button>
+          )}
+        </div>
       </div>
 
       {!isMinimized && (
