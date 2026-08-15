@@ -8,6 +8,7 @@ interface UiState {
   deleteDialogAgentId: string | null;
   settingsOpen: boolean;
   libraryOpen: boolean;
+  saveTeamDialogOpen: boolean;
   searchQuery: string;
   contextMenu: { x: number; y: number; agentId: string } | null;
 }
@@ -23,6 +24,8 @@ interface UiActions {
   closeDeleteDialog: () => void;
   toggleSettings: () => void;
   toggleLibrary: () => void;
+  openSaveTeamDialog: () => void;
+  closeSaveTeamDialog: () => void;
   setSearchQuery: (query: string) => void;
   openContextMenu: (x: number, y: number, agentId: string) => void;
   closeContextMenu: () => void;
@@ -38,6 +41,7 @@ export const useUiStore = create<UiStore>((set) => ({
   deleteDialogAgentId: null,
   settingsOpen: false,
   libraryOpen: false,
+  saveTeamDialogOpen: false,
   searchQuery: '',
   contextMenu: null,
 
@@ -51,7 +55,10 @@ export const useUiStore = create<UiStore>((set) => ({
   closeDeleteDialog: () => set({ deleteDialogAgentId: null }),
   toggleSettings: () => set((s) => ({ settingsOpen: !s.settingsOpen })),
   toggleLibrary: () => set((s) => ({ libraryOpen: !s.libraryOpen })),
+  openSaveTeamDialog: () => set({ saveTeamDialogOpen: true }),
+  closeSaveTeamDialog: () => set({ saveTeamDialogOpen: false }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   openContextMenu: (x, y, agentId) => set({ contextMenu: { x, y, agentId } }),
   closeContextMenu: () => set({ contextMenu: null }),
 }));
+

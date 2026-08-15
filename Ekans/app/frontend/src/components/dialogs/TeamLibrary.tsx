@@ -1,10 +1,12 @@
 /* ================================================================
-   TEAM LIBRARY — Full-page overlay to save, browse, and load teams
+   TEAM LIBRARY — Full-page overlay to browse, import, and manage teams
    ================================================================ */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useUiStore } from '@/store/ui-store';
 import { useLibraryStore, type SavedTeam } from '@/store/library-store';
+import { TeamGraphPreview } from '@/components/canvas/TeamGraphPreview';
+import { toast } from '@/components/common/Toast';
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -28,8 +30,9 @@ function CloseIcon() {
   );
 }
 
-function TeamCard({ team, onLoad, onDelete, onRename }: {
+function TeamCard({ team, isActive, onLoad, onDelete, onRename }: {
   team: SavedTeam;
+  isActive: boolean;
   onLoad: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
@@ -57,7 +60,7 @@ function TeamCard({ team, onLoad, onDelete, onRename }: {
   };
 
   return (
-    <div className="team-card">
+    <div className={`team-card ${isActive ? 'active-team-card' : ''}`}>
       <div className="team-card-header">
         {editing ? (
           <input
@@ -72,16 +75,22 @@ function TeamCard({ team, onLoad, onDelete, onRename }: {
             }}
           />
         ) : (
-          <h3
-            className="team-card-name"
-            onDoubleClick={() => { setEditing(true); setEditName(team.name); }}
-            title="Double-click to rename"
-          >
-            {team.name}
-          </h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <h3
+              className="team-card-name"
+              onDoubleClick={() => { setEditing(true); setEditName(team.name); }}
+              title="Double-click to rename"
+            >
+              {team.name}
+            </h3>
+            {isActive && <span className="team-card-active-pill">Active in Workspace</span>}
+          </div>
         )}
         <span className="team-card-date">{formatDate(team.savedAt)}</span>
       </div>
+
+      {/* Graphical Agent Hierarchy Preview */}
+      <TeamGraphPreview team={team} />
 
       {team.description && (
         <p className="team-card-description">{team.description}</p>
@@ -94,9 +103,14 @@ function TeamCard({ team, onLoad, onDelete, onRename }: {
         )}
       </div>
 
+
       <div className="team-card-actions">
-        <button className="team-card-btn team-card-btn-load" onClick={() => onLoad(team.id)}>
-          Load
+        <button
+          className={`team-card-btn ${isActive ? 'team-card-btn-active' : 'team-card-btn-load'}`}
+          onClick={() => onLoad(team.id)}
+          title={isActive ? 'Reload this team in workspace' : 'Import this team to workspace'}
+        >
+          {isActive ? 'Reload Team' : 'Import Team'}
         </button>
         {confirmDelete ? (
           <div className="team-card-confirm">
@@ -121,37 +135,25 @@ function TeamCard({ team, onLoad, onDelete, onRename }: {
 export function TeamLibrary() {
   const libraryOpen = useUiStore((s) => s.libraryOpen);
   const toggleLibrary = useUiStore((s) => s.toggleLibrary);
+  const openSaveTeamDialog = useUiStore((s) => s.openSaveTeamDialog);
   const teams = useLibraryStore((s) => s.teams);
+  const activeTeamId = useLibraryStore((s) => s.activeTeamId);
   const loadFromStorage = useLibraryStore((s) => s.loadFromStorage);
-  const saveCurrentTeam = useLibraryStore((s) => s.saveCurrentTeam);
   const loadTeam = useLibraryStore((s) => s.loadTeam);
   const deleteTeam = useLibraryStore((s) => s.deleteTeam);
   const renameTeam = useLibraryStore((s) => s.renameTeam);
 
-  const [saveName, setSaveName] = useState('');
-  const [saveDescription, setSaveDescription] = useState('');
+  const [search, setSearch] = useState('');
   const [confirmLoadId, setConfirmLoadId] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Load teams from storage when overlay opens
   useEffect(() => {
     if (libraryOpen) {
       loadFromStorage();
-      setSaveName('');
-      setSaveDescription('');
-      setSaveSuccess(false);
+      setSearch('');
       setConfirmLoadId(null);
     }
   }, [libraryOpen, loadFromStorage]);
-
-  const handleSave = useCallback(() => {
-    if (!saveName.trim()) return;
-    saveCurrentTeam(saveName, saveDescription);
-    setSaveName('');
-    setSaveDescription('');
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 2000);
-  }, [saveName, saveDescription, saveCurrentTeam]);
 
   const handleLoad = useCallback((id: string) => {
     setConfirmLoadId(id);
@@ -159,11 +161,15 @@ export function TeamLibrary() {
 
   const handleConfirmLoad = useCallback(() => {
     if (confirmLoadId) {
+      const target = teams.find((t) => t.id === confirmLoadId);
       loadTeam(confirmLoadId);
       setConfirmLoadId(null);
       toggleLibrary();
+      if (target) {
+        toast(`Imported team "${target.name}" to workspace`, 'success');
+      }
     }
-  }, [confirmLoadId, loadTeam, toggleLibrary]);
+  }, [confirmLoadId, teams, loadTeam, toggleLibrary]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -175,6 +181,12 @@ export function TeamLibrary() {
     }
   }, [confirmLoadId, toggleLibrary]);
 
+  const filteredTeams = teams.filter((t) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return t.name.toLowerCase().includes(q) || (t.description && t.description.toLowerCase().includes(q));
+  });
+
   if (!libraryOpen) return null;
 
   return (
@@ -183,12 +195,13 @@ export function TeamLibrary() {
       {confirmLoadId && (
         <div className="team-library-confirm-backdrop">
           <div className="team-library-confirm-dialog">
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>Import Team</h3>
             <p className="team-library-confirm-text">
-              Loading a team will replace your current workspace. Any unsaved changes will be lost.
+              Importing this team will replace your current workspace nodes and relationships. Any unsaved changes in the workspace will be overwritten.
             </p>
             <div className="team-library-confirm-actions">
               <button className="team-card-btn team-card-btn-load" onClick={handleConfirmLoad}>
-                Load Team
+                Import to Workspace
               </button>
               <button className="team-card-btn team-card-btn-cancel" onClick={() => setConfirmLoadId(null)}>
                 Cancel
@@ -205,41 +218,40 @@ export function TeamLibrary() {
             <h1 className="team-library-title">Team Library</h1>
             <span className="team-library-count">{teams.length} saved team{teams.length !== 1 ? 's' : ''}</span>
           </div>
-          <button className="team-library-close" onClick={toggleLibrary} title="Close library">
-            <CloseIcon />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                toggleLibrary();
+                openSaveTeamDialog();
+              }}
+              style={{ fontSize: 12, padding: '7px 14px' }}
+            >
+              Save Current Workspace as Team
+            </button>
+            <button className="team-library-close" onClick={toggleLibrary} title="Close library">
+              <CloseIcon />
+            </button>
+          </div>
         </header>
 
-        {/* Save current team bar */}
-        <div className="team-library-save-bar">
-          <div className="team-library-save-fields">
+        {/* Search bar if teams exist */}
+        {teams.length > 0 && (
+          <div className="team-library-search-bar">
             <input
-              className="team-library-save-input"
               type="text"
-              placeholder="Team name"
-              value={saveName}
-              onChange={(e) => setSaveName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }}
-              maxLength={80}
+              className="team-library-search-input"
+              placeholder="Search saved teams..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
-            <input
-              className="team-library-save-input team-library-save-desc"
-              type="text"
-              placeholder="Description (optional)"
-              value={saveDescription}
-              onChange={(e) => setSaveDescription(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }}
-              maxLength={200}
-            />
+            {search && (
+              <button className="team-library-search-clear" onClick={() => setSearch('')}>
+                Clear
+              </button>
+            )}
           </div>
-          <button
-            className="team-library-save-btn"
-            onClick={handleSave}
-            disabled={!saveName.trim()}
-          >
-            {saveSuccess ? 'Saved' : 'Save Current Team'}
-          </button>
-        </div>
+        )}
 
         {/* Team list */}
         <div className="team-library-content">
@@ -255,16 +267,33 @@ export function TeamLibrary() {
               </div>
               <h3 className="team-library-empty-title">No saved teams yet</h3>
               <p className="team-library-empty-text">
-                Build a team in the workspace, then save it here to reuse later.
-                Give it a name above and click "Save Current Team".
+                Build your team in the main workspace, then click the "Save Team" button in the toolbar to save it here for fast recall.
               </p>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  toggleLibrary();
+                  openSaveTeamDialog();
+                }}
+                style={{ marginTop: 8 }}
+              >
+                Save Current Team
+              </button>
+            </div>
+          ) : filteredTeams.length === 0 ? (
+            <div className="team-library-empty">
+              <p className="team-library-empty-text">No teams match "{search}".</p>
+              <button className="btn btn-ghost" onClick={() => setSearch('')}>
+                Clear Filter
+              </button>
             </div>
           ) : (
             <div className="team-library-grid">
-              {teams.map((team) => (
+              {filteredTeams.map((team) => (
                 <TeamCard
                   key={team.id}
                   team={team}
+                  isActive={team.id === activeTeamId}
                   onLoad={handleLoad}
                   onDelete={deleteTeam}
                   onRename={renameTeam}

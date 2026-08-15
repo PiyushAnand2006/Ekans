@@ -9,17 +9,20 @@ import { CreateAgentDialog } from '@/components/dialogs/CreateAgentDialog';
 import { DeleteConfirmDialog } from '@/components/dialogs/DeleteConfirmDialog';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { TeamLibrary } from '@/components/dialogs/TeamLibrary';
+import { SaveTeamDialog } from '@/components/dialogs/SaveTeamDialog';
 import { RunDashboard } from '@/components/runtime/RunDashboard';
 import { useUiStore } from '@/store/ui-store';
+import { useLibraryStore } from '@/store/library-store';
 import { initVaultAutoSave } from '@/memory/vault-store';
 import './App.css';
 
 function App() {
   const inspectorOpen = useUiStore((s) => s.inspectorOpen);
 
-  // Initialize vault auto-save on mount
+  // Initialize vault auto-save and library store on mount
   useEffect(() => {
     initVaultAutoSave();
+    useLibraryStore.getState().loadFromStorage();
   }, []);
 
   return (
@@ -39,6 +42,7 @@ function App() {
       <CreateAgentDialog />
       <DeleteConfirmDialog />
       <SettingsDialog />
+      <SaveTeamDialog />
       <TeamLibrary />
       <ToastContainer />
     </div>
@@ -46,3 +50,4 @@ function App() {
 }
 
 export default App;
+
